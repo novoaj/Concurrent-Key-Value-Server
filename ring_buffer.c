@@ -1,4 +1,5 @@
 #include "ring_buffer.h"
+#include <stdatomic.h>
 
 /*
  * Initialize the ring
@@ -13,7 +14,7 @@ int init_ring(struct ring *r){
     // mem already allocated?
     // ring is simply an array
     pthread_mutex_init(&r->lk, NULL); // Initialize the mutex lock
-    pthread_mutex_lock(&r->lk);
+    pthread_mutex_lock(&r->lk); // instead of lock maybe atomic instructions
     r->p_head = 0; // consider 0 invalid
     r->p_tail = 0; 
     r->c_head = 0;
@@ -33,22 +34,21 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     // atomically increment p_head https://doc.dpdk.org/guides/prog_guide/ring_lib.html 
     uint32_t prod_head, prod_next, cons_tail;
 
-    pthread_mutex_lock(&r->lk);
     prod_head = r->p_head; // 0 1
-    prod_next = (r->p_head + 1) % RING_SIZE; // 1 2
     cons_tail = r->c_tail; // 0 0
     // if not enough space, block and wait
-    // while (cons_tail == prod_next){
-    //     ;// put to sleep/wait/block, need to signal when there is space?
-    // }
-    // increment p_head // 1 2
-    r->p_head = prod_next; // ring structs p_head points to next ("prod_head" block is reserved for copy operation)
-    pthread_mutex_unlock(&r->lk);
-    // bd copied to 0, bd copied to 1
+    if (prod_head >= cons_tail){
+        // wait?
+    }
+    // atomically increment producer head
+    while (!atomic_compare_exchange_strong(&r->p_head, &prod_head, prod_head + 1)){
+        prod_head = r->p_head;
+    }
+
+    // copy data
     r->buffer[prod_head] = *bd; // copy item allowing for concurrent copies (atomic operation is moving the head pointer)
-    // tail points to 0, 1
-    r->p_tail = prod_next; // does incrementing tail need to be atomic?
-    // consider two concurrent submits - what if first submit gets copied over before second?
+    // increment tail once copy is complete
+    r->p_tail = r->p_tail + 1; // does incrementing tail need to be atomic?
 }
 /*
  * Get an item from the ring - should be thread-safe
@@ -59,22 +59,33 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
  * the signature.
 */
 void ring_get(struct ring *r, struct buffer_descriptor *bd){
-    // copy c_head to bd?
+    // save prod tail and cons head in vars
+    // if prod tail > cons_head, move cons head forward one. so we are currently reserving that idx
+    // atomically xchg prod head for get (increment it)
+
     uint32_t cons_head, cons_next, prod_tail;
-
-    pthread_mutex_lock(&r->lk);
     cons_head = r->c_head;
-    cons_next = (r->c_head + 1) % RING_SIZE;
+    //cons_next = (r->c_head + 1) % RING_SIZE;
     prod_tail = r->p_tail;
-    // are there any items to consume?
-    // p_tail marks a valid item to consume, idxs between p_tail and p_head are not yet ready to consume
-    // from cons_head to prod_tail is valid items to consume?
-    // while (cons_next > prod_tail) {
-        
-    // }
-    r->c_head = cons_next; // increment consumer head
-    pthread_mutex_unlock(&r->lk);
+    // block if not enough space
+    if (prod_tail <= cons_head) {
+        // wait?
+    }
+    // original, expected, new
+    // https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html
+    // https://stackoverflow.com/questions/26463074/is-there-a-difference-between-the-atomic-type-qualifier-and-type-specifier 
+    while (!atomic_compare_exchange_strong(&r->c_head, &cons_head, cons_head + 1)){
+        cons_head = r->c_head;
+    }
 
-    *bd = r->buffer[cons_head]; // consume item
-    r->c_tail = cons_next;
+    *bd = r->buffer[cons_head]; // consume item, maybe memcpy or deep copy? this is reference copy which could be fine?
+    // increment tail once after copy is complete
+    r->c_tail = r->c_tail + 1;
+}
+
+int test_get(){
+    return 0;
+}
+int main() {
+    return 1;
 }
