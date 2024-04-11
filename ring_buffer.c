@@ -9,14 +9,9 @@
  * printed to output by the client program
 */
 int init_ring(struct ring *r){
-    // init ring buffer
-    // need to allow for concurrent accesses of buffer
-    // buffer max size is 1024, defined in .h file
-    // mem already allocated?
-    // ring is simply an array
     pthread_mutex_init(&r->lk, NULL); // Initialize the mutex lock
     pthread_mutex_lock(&r->lk); // instead of lock maybe atomic instructions
-    r->p_head = 0; // consider 0 invalid
+    r->p_head = 0; // all start at 0
     r->p_tail = 0; 
     r->c_head = 0;
     r->c_tail = 0;
@@ -39,10 +34,10 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     cons_tail = r->c_tail; 
     prod_next = prod_head + 1;
     // if not enough space, block and wait
+    // ?ph - ct >= ring_size //
     if (prod_next == cons_tail){
         // wait until an item is consumed? so wait until cons_tail changes?
-        // if p_head + 1 overlaps with consumer, we cant insert because there isn't enough space
-        // wait?
+        // if p_head + 1 overlaps with consumer tail, we cant insert because there isn't enough space
     }
     // atomically increment producer head
     while (!atomic_compare_exchange_strong(&r->p_head, &prod_head, prod_head + 1)){
@@ -87,9 +82,9 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     r->c_tail = r->c_tail + 1;
 }
 
-int print_ring(struct ring *r){
-    for (int i = 0; i < 1024; i++){
-        printf("%d: %d\n", r->buffer[i].k, r->buffer[i].v);
-    }
-    return 0;
-}
+// int print_ring(struct ring *r){
+//     for (int i = 0; i < 1024; i++){
+//         printf("%d: %d\n", r->buffer[i].k, r->buffer[i].v);
+//     }
+//     return 0;
+// }
