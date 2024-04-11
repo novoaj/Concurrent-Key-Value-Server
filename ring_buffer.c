@@ -1,5 +1,6 @@
 #include "ring_buffer.h"
 #include <stdatomic.h>
+#include <stdio.h>
 
 /*
  * Initialize the ring
@@ -34,10 +35,13 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     // atomically increment p_head https://doc.dpdk.org/guides/prog_guide/ring_lib.html 
     uint32_t prod_head, prod_next, cons_tail;
 
-    prod_head = r->p_head; // 0 1
-    cons_tail = r->c_tail; // 0 0
+    prod_head = r->p_head; 
+    cons_tail = r->c_tail; 
+    prod_next = prod_head + 1;
     // if not enough space, block and wait
-    if (prod_head >= cons_tail){
+    if (prod_next == cons_tail){
+        // wait until an item is consumed? so wait until cons_tail changes?
+        // if p_head + 1 overlaps with consumer, we cant insert because there isn't enough space
         // wait?
     }
     // atomically increment producer head
@@ -67,8 +71,8 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     cons_head = r->c_head;
     //cons_next = (r->c_head + 1) % RING_SIZE;
     prod_tail = r->p_tail;
-    // block if not enough space
-    if (prod_tail <= cons_head) {
+    // block if no valid items to consume
+    if (cons_head == prod_tail) { // means that cons_next isn't valid for consuming yet? 
         // wait?
     }
     // original, expected, new
@@ -83,9 +87,9 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     r->c_tail = r->c_tail + 1;
 }
 
-int test_get(){
+int print_ring(struct ring *r){
+    for (int i = 0; i < 1024; i++){
+        printf("%d: %d\n", r->buffer[i].k, r->buffer[i].v);
+    }
     return 0;
-}
-int main() {
-    return 1;
 }
