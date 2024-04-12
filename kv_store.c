@@ -5,6 +5,8 @@
 #include <sys/mman.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
 
 // global variables
 int hashtable_size;
@@ -77,6 +79,11 @@ void put(key_type k, value_type v){
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
 }
 
+void workerThread(struct ring* r) {
+    // worker thread should run indefinitely, processing requests from ring.
+    // this function will call put and get 
+    // need to mutate shmem upon processing requests
+}
 
 int main(int argc, char *argv[]){
     if (argc != 5) {
@@ -101,21 +108,25 @@ int main(int argc, char *argv[]){
     if(init_server_threads == -1 || hashtable_size == -1){
         return -1;
     }
-
+    initHashtable(init_hashtable_size);
     hashtable_size = init_hashtable_size;
     server_threads = init_server_threads;
     // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
-    // char* shmem_file = "shmem_file";
+    char* shmem_file = "shmem_file";
+    // stat to get size of file
     // // map shmem file to memory so we can access it
-    // int fd = open(shmem_file, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-	// if (fd < 0)
-	// 	perror("open");
+    int fd = open(shmem_file, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+	if (fd < 0)
+	    perror("open");
     // // map file
-    // char *mem = mmap(NULL, shm_size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-	// if (mem == (void *)-1) 
-	// 	perror("mmap");
-
-	// /* mmap dups the fd, no longer needed */
-	// close(fd);
+    struct stat buf;
+    fstat(fd, &buf);
+    int shm_size = buf.st_size; // https://stackoverflow.com/questions/238603/how-can-i-get-a-files-size-in-c
+    char *mem = mmap(NULL, shm_size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+	if (mem == (void *)-1) 
+	    perror("mmap");
+    // start of mem + res_off
+	close(fd);
+    struct ring* r = mem; // refernece  to our ring struct in shared mem
     return 0;
 }
