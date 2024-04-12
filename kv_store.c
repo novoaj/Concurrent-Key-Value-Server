@@ -42,6 +42,7 @@ int get_value_idx(bucket_t* bucket, key_type k){
     }
     return -1;
 }
+
 value_type get(key_type k){
     index_t hash_index = hash_function(k, hashtable_size);
     value_type v = 0;
@@ -83,6 +84,23 @@ void workerThread(struct ring* r) {
     // worker thread should run indefinitely, processing requests from ring.
     // this function will call put and get 
     // need to mutate shmem upon processing requests
+    struct buffer_descriptor* buf;
+
+    buf = malloc(sizeof(struct buffer_descriptor));
+    while(1){
+        ring_get(r, buf);
+        struct buffer_descriptor *result = (struct buffer_descriptor *)&r + buf->res_off;
+        memcpy(result, buf, sizeof(struct buffer_descriptor));
+        result->ready = 1;
+        if(buf->req_type == PUT){
+            put(buf->k, buf->v);
+        }
+        else if(buf->req_type == GET){
+            get(buf->k);
+            // may need to handle fail case
+        }
+        
+    }
 }
 
 int main(int argc, char *argv[]){
@@ -105,7 +123,7 @@ int main(int argc, char *argv[]){
         }
     }
 
-    if(init_server_threads == -1 || hashtable_size == -1){
+    if(init_server_threads == -1 || init_hashtable_size == -1){
         return -1;
     }
     initHashtable(init_hashtable_size);
@@ -127,6 +145,6 @@ int main(int argc, char *argv[]){
 	    perror("mmap");
     // start of mem + res_off
 	close(fd);
-    struct ring* r = mem; // refernece  to our ring struct in shared mem
+    struct ring* r = (struct ring *) mem; // refernece  to our ring struct in shared mem
     return 0;
 }
