@@ -1,104 +1,121 @@
-#include "common.h"
+#include "ring_buffer.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include "ring_buffer.h"
+#include <string.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
+// global variables
+int hashtable_size;
+int server_threads;
+
+// struct of each bucket in the hashtable
+// each bucket has a value and a mutex
+// MIGHT WANT TO CHANGE THIS FROM VALUE_TYPE TO A LIST OF VALUE TYPES
+typedef struct {
+    value_type value[1024];
+    key_type keys[1024];
+    pthread_mutex_t mutex; 
+} bucket_t;
 
 
+bucket_t *hashtable;
 
-typedef struct Node{
-    key_type key;
-    value_type val;
-    struct Node* next;
-} Node;
-
-typedef struct hashtable{
-    Node** array;
-    int size;
-}hashtable;
-
-hashtable* serverHashtable;
-
-hashtable* initializeHashtable(int size){
-    hashtable* ht = (hashtable*)malloc(sizeof(hashtable));
-    if (ht == NULL){
-        fprintf(stderr, "Mem allocation for ht failed");
-        exit(EXIT_FAILURE);
+void initHashtable(int size){
+    hashtable = (bucket_t *)malloc(size * sizeof(bucket_t));
+    hashtable_size = size;
+    for(int i = 0; i < size; i++){
+        pthread_mutex_init(&hashtable[i].mutex, NULL);
+        hashtable->value[i] = 0;
     }
-
-    ht->array = (Node**)malloc(size*sizeof(Node*));
-    if (ht->array == NULL){
-        fprintf(stderr, "Mem allocation for ht->array failed");
-        exit(EXIT_FAILURE);
-    }
-
-    for (int i = 0; i < size; i++) {
-        ht->array[i] = NULL;
-    }
-
-    ht->size = size;
-
-    return ht;
 }
-/*
- * insert or update value at key "k"
-*/
-int put(key_type k, value_type v){
-    int BucketIdx = hash_function(k, serverHashtable->size);
-    // acquire lock for this idx
-    return -1;
-}
-/*
- * retrieve value with key "k" from hashtable, returns 0 if it doesn't exist
-*/
-int get(key_type k) {
-    int BucketIdx = hash_function(k, serverHashtable->size);
-    // acquire lock for this idx
-    return -1;
-}
-void workerThread(){
-
-}
-/*
- * this is our server program. it will use ring_buffer get in order to retrieve requests. 
- "The server should be able to fetch requests from the Ring Buffer, and update the Request-status Board 
-  after completing the requests. We expect the server to be faster with an increase in number of threads"
-*/
-int main(int argc, char* argv[]){
-    // args can be with flags -n and -s
-    // both flags should be followed by a number - e.g: './server -n 2 -s 5'
-    // Here, -n is the number of threads, and -s is the initial hashtable size for the KV Store.
-    int numThreads = 0;
-    int hashtableSize = 0;
-
-    int opt;
-    int opt_idx = 0;
-
-    while ((opt = getopt(argc, argv, "n:s:")) != -1) {
-        switch (opt) {
-            case 'n':
-                numThreads = atoi(optarg);
-                break;
-            case 's':
-                hashtableSize = atoi(optarg);
-                break;
-            default: 
-                printf("error, need -n, and -s flags\n");
-                return -1;
+// returns idx that value lives at (this is for the case when key already exists in this bucket)
+// return -1 if no value found
+int get_value_idx(bucket_t* bucket, key_type k){
+    for (int i = 0; i < 1024; i++){
+        if (bucket->keys[i] == k){
+            return i;
         }
     }
-    printf("numThreads: %d, htsize: %d\n", numThreads, hashtableSize);
-    if (numThreads <= 0 || hashtableSize <= 0){
-        printf("-n and -s flags must be provided with a positive integer\n");
+    return -1;
+}
+value_type get(key_type k){
+    index_t hash_index = hash_function(k, hashtable_size);
+    value_type v = 0;
+    
+    pthread_mutex_lock(&hashtable[hash_index].mutex);
+    for(int i = 0; i < 1024; i++){
+        if(hashtable[hash_index].keys[i] == k){
+            v = hashtable[hash_index].value[i];
+        }
+    }
+    pthread_mutex_unlock(&hashtable[hash_index].mutex);
+    return v;
+}
+
+
+void put(key_type k, value_type v){
+    
+    index_t hash_index = hash_function(k, hashtable_size);
+    pthread_mutex_lock(&hashtable[hash_index].mutex);
+   
+    int valueIdx = get_value_idx(&hashtable[hash_index], k);
+     
+    // new item: insert value and key
+    if (valueIdx == -1){
+        // naive insert
+        for (int i = 0; i < 1024; i++){
+            if (hashtable[hash_index].value[i] == 0) {
+                hashtable[hash_index].value[i] = v;
+                break;
+            }
+        }
+    }else{ // item exists (key exists): update value
+        hashtable[hash_index].value[valueIdx] = v;
+    }
+    pthread_mutex_unlock(&hashtable[hash_index].mutex);
+}
+
+
+int main(int argc, char *argv[]){
+    if (argc != 5) {
+        printf("Usage: %s -n <num_threads> -s <initial_hashtable_size>\n", argv[0]);
         return -1;
     }
-    // create threads as specified by args?
-    // thread function will run indefinitely processing requests. 
-    // try to get something from ring (ring_get) within loop and service this request, 
-    // client status board: no structure, just a bunch of memory, we need to use that and do some addition of addrs to figure out how to access this
-    // mmap to map shmem into mem? to access it
-    serverHashtable = initializeHashtable(hashtableSize);
-    // initialize a array same size as hashtable where each idx holds a lock
 
+    int init_server_threads = -1;
+    int init_hashtable_size = -1;
+
+    for (int i = 1; i < argc; i += 2) {
+        if (strcmp(argv[i], "-n") == 0) {
+            init_server_threads = atoi(argv[i + 1]);
+        } else if (strcmp(argv[i], "-s") == 0) {
+            init_hashtable_size = atoi(argv[i + 1]);
+        } else {
+            printf("Invalid argument: %s\n", argv[i]);
+            return -1;
+        }
+    }
+
+    if(init_server_threads == -1 || hashtable_size == -1){
+        return -1;
+    }
+
+    hashtable_size = init_hashtable_size;
+    server_threads = init_server_threads;
+    // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
+    // char* shmem_file = "shmem_file";
+    // // map shmem file to memory so we can access it
+    // int fd = open(shmem_file, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+	// if (fd < 0)
+	// 	perror("open");
+    // // map file
+    // char *mem = mmap(NULL, shm_size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
+	// if (mem == (void *)-1) 
+	// 	perror("mmap");
+
+	// /* mmap dups the fd, no longer needed */
+	// close(fd);
     return 0;
 }

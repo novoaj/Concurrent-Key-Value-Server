@@ -1,6 +1,40 @@
 #include "ring_buffer.h"
-#include <stdatomic.h>
-#include <stdio.h>
+#include <stdlib.h>
+
+pthread_mutex_t ring_mutex;
+pthread_cond_t ring_not_full = PTHREAD_COND_INITIALIZER;
+pthread_cond_t ring_not_empty = PTHREAD_COND_INITIALIZER;
+
+/**
+ * Helper method that checks if ring buffer is full
+ * Returns 0 if not full (meaning some space still available)
+ * Returns 1 if full
+*/
+int is_ring_full(struct ring *r){
+    for(int i = 0; i < RING_SIZE; i++){
+        if(r->buffer[i].v == 0){
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/**
+ * Helper method that checks if ring buffer is empty
+ * Returns 0 if not empty (meaning there's something in there)
+ * Returns 1 if empty
+*/
+int is_ring_empty(struct ring *r){
+    for(int i = 0; i < RING_SIZE; i++){
+        if(r->buffer[i].v!= 0){
+            return 0;
+        }
+    }
+    return 1;
+}
+void init_mutex(){
+    pthread_mutex_init(&ring_mutex, NULL);
+}
 
 /*
  * Initialize the ring
@@ -9,16 +43,22 @@
  * printed to output by the client program
 */
 int init_ring(struct ring *r){
-    pthread_mutex_init(&r->lk, NULL); // Initialize the mutex lock
-    pthread_mutex_lock(&r->lk); // instead of lock maybe atomic instructions
-    r->p_head = 0; // all start at 0
+    r->c_head = 0; 
+    r->c_tail = 0; 
+    r->p_head = 0; 
     r->p_tail = 0; 
-    r->c_head = 0;
-    r->c_tail = 0;
-    // r->buffer // this buffer -> array of structs
-    pthread_mutex_unlock(&r->lk);
+
+    for(int i = 0; i < RING_SIZE; i++){
+        r->buffer[i].req_type = -1; // not set to anything yet
+        r->buffer[i].k = 0;
+        r->buffer[i].v = 0;
+        r->buffer[i].res_off = 0;
+        r->buffer[i].ready = 0;
+    }
+
     return 0;
 }
+
 /*
  * Submit a new item - should be thread-safe
  * This call will block the calling thread if there's not enough space
@@ -27,29 +67,25 @@ int init_ring(struct ring *r){
  * guaranteed to be valid during the invocation of the function
 */
 void ring_submit(struct ring *r, struct buffer_descriptor *bd){
-    // atomically increment p_head https://doc.dpdk.org/guides/prog_guide/ring_lib.html 
-    uint32_t prod_head, prod_next, cons_tail;
-
-    prod_head = r->p_head; 
-    cons_tail = r->c_tail; 
-    prod_next = prod_head + 1;
-    // if not enough space, block and wait
-    // ?ph - ct >= ring_size //
-    if (prod_next == cons_tail){
-        // wait until an item is consumed? so wait until cons_tail changes?
-        // if p_head + 1 overlaps with consumer tail, we cant insert because there isn't enough space
-    }
-    // while(atomic_compare_exchange_strong(original, expected, new))
-    // atomically increment producer head
-    while (!atomic_compare_exchange_strong(&r->p_head, &prod_head, prod_head + 1)){
-        prod_head = r->p_head;
+    
+    pthread_mutex_lock(&ring_mutex);
+    // wait for buffer to have open spots
+    while(is_ring_full(r) == 1){
+        pthread_cond_wait(&ring_not_empty, &ring_mutex);
     }
 
-    // copy data
-    r->buffer[prod_head] = *bd; // copy item allowing for concurrent copies (atomic operation is moving the head pointer)
-    // increment tail once copy is complete
-    r->p_tail = r->p_tail + 1; // does incrementing tail need to be atomic?
+    // get next index and wrap around if too large
+    int next_index = (r->p_head + 1) % RING_SIZE;
+    r->buffer[next_index] = *bd;
+    r->p_head = next_index;
+    r->p_tail = (r->p_tail + 1) % RING_SIZE;
+
+    // signal buffer is not empty 
+    pthread_cond_signal(&ring_not_empty);
+
+    pthread_mutex_unlock(&ring_mutex);
 }
+
 /*
  * Get an item from the ring - should be thread-safe
  * This call will block the calling thread if the ring is empty
@@ -59,34 +95,23 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
  * the signature.
 */
 void ring_get(struct ring *r, struct buffer_descriptor *bd){
-    // save prod tail and cons head in vars
-    // if prod tail > cons_head, move cons head forward one. so we are currently reserving that idx
-    // atomically xchg prod head for get (increment it)
 
-    uint32_t cons_head, cons_next, prod_tail;
-    cons_head = r->c_head;
-    //cons_next = (r->c_head + 1) % RING_SIZE;
-    prod_tail = r->p_tail;
-    // block if no valid items to consume
-    if (cons_head == prod_tail) { // means that cons_next isn't valid for consuming yet? 
-        // wait?
-    }
-    // original, expected, new
-    // https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html
-    // https://stackoverflow.com/questions/26463074/is-there-a-difference-between-the-atomic-type-qualifier-and-type-specifier 
-    while (!atomic_compare_exchange_strong(&r->c_head, &cons_head, cons_head + 1)){
-        cons_head = r->c_head;
+    pthread_mutex_lock(&ring_mutex);
+
+    while(is_ring_empty(r) == 1){
+        pthread_cond_wait(&ring_not_empty, &ring_mutex);
     }
 
-    // potentially memcpy or deep copy
-    *bd = r->buffer[cons_head]; // consume item, maybe memcpy or deep copy? this is reference copy which could be fine?
-    // increment tail once after copy is complete
-    r->c_tail = r->c_tail + 1;
+    // copy buffer descriptor from ring buffer
+    // potentially move this out of lock to improve performance
+    *bd = r->buffer[r->c_head];
+
+    r->c_head = (r->c_head + 1) % RING_SIZE;
+
+    // signal that buffer is not full anymore
+    pthread_cond_signal(&ring_not_full);
+
+    pthread_mutex_unlock(&ring_mutex);
 }
 
-// int print_ring(struct ring *r){
-//     for (int i = 0; i < 1024; i++){
-//         printf("%d: %d\n", r->buffer[i].k, r->buffer[i].v);
-//     }
-//     return 0;
-// }
+

@@ -12,6 +12,7 @@ int server_threads;
 // MIGHT WANT TO CHANGE THIS FROM VALUE_TYPE TO A LIST OF VALUE TYPES
 typedef struct {
     value_type value[1024];
+    key_type keys[1024];
     pthread_mutex_t mutex; 
 } bucket_t;
 
@@ -26,20 +27,25 @@ void initHashtable(int size){
         hashtable->value[i] = 0;
     }
 }
-
+// returns idx that value lives at (this is for the case when key already exists in this bucket)
+// return -1 if no value found
+int get_value_idx(bucket_t* bucket, key_type k){
+    for (int i = 0; i < 1024; i++){
+        if (bucket->keys[i] == k){
+            return i;
+        }
+    }
+    return -1;
+}
 value_type get(key_type k){
     index_t hash_index = hash_function(k, hashtable_size);
-    value_type v;
+    value_type v = 0;
     
     pthread_mutex_lock(&hashtable[hash_index].mutex);
     for(int i = 0; i < 1024; i++){
-        if(hashtable[hash_index].value[i])
-    }
-    if(!hashtable[hash_index].value){
-        v = hashtable[hash_index].value;
-    }
-    else{
-        v = 0;
+        if(hashtable[hash_index].keys[i] == k){
+            v = hashtable[hash_index].value[i];
+        }
     }
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
     return v;
@@ -50,10 +56,21 @@ void put(key_type k, value_type v){
     
     index_t hash_index = hash_function(k, hashtable_size);
     pthread_mutex_lock(&hashtable[hash_index].mutex);
-    if(get(k) != 0){
-        hash_index = get(k);
+   
+    int valueIdx = get_value_idx(&hashtable[hash_index], k);
+     
+    // new item: insert value and key
+    if (valueIdx == -1){
+        // naive insert
+        for (int i = 0; i < 1024; i++){
+            if (hashtable[hash_index].value[i] == 0) {
+                hashtable[hash_index].value[i] = v;
+                break;
+            }
+        }
+    }else{ // item exists (key exists): update value
+        hashtable[hash_index].value[valueIdx] = v;
     }
-    hashtable[hash_index].value = v; // put value in hash table
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
 }
 
