@@ -39,6 +39,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
         // wait until an item is consumed? so wait until cons_tail changes?
         // if p_head + 1 overlaps with consumer tail, we cant insert because there isn't enough space
     }
+    // while(atomic_compare_exchange_strong(original, expected, new))
     // atomically increment producer head
     while (!atomic_compare_exchange_strong(&r->p_head, &prod_head, prod_head + 1)){
         prod_head = r->p_head;
@@ -77,6 +78,7 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
         cons_head = r->c_head;
     }
 
+    // potentially memcpy or deep copy
     *bd = r->buffer[cons_head]; // consume item, maybe memcpy or deep copy? this is reference copy which could be fine?
     // increment tail once after copy is complete
     r->c_tail = r->c_tail + 1;

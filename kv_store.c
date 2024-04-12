@@ -4,14 +4,60 @@
 #include <unistd.h>
 #include "ring_buffer.h"
 
+
+
+typedef struct Node{
+    key_type key;
+    value_type val;
+    struct Node* next;
+} Node;
+
+typedef struct hashtable{
+    Node** array;
+    int size;
+}hashtable;
+
+hashtable* serverHashtable;
+
+hashtable* initializeHashtable(int size){
+    hashtable* ht = (hashtable*)malloc(sizeof(hashtable));
+    if (ht == NULL){
+        fprintf(stderr, "Mem allocation for ht failed");
+        exit(EXIT_FAILURE);
+    }
+
+    ht->array = (Node**)malloc(size*sizeof(Node*));
+    if (ht->array == NULL){
+        fprintf(stderr, "Mem allocation for ht->array failed");
+        exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < size; i++) {
+        ht->array[i] = NULL;
+    }
+
+    ht->size = size;
+
+    return ht;
+}
+/*
+ * insert or update value at key "k"
+*/
 int put(key_type k, value_type v){
+    int BucketIdx = hash_function(k, serverHashtable->size);
+    // acquire lock for this idx
     return -1;
 }
 /*
  * retrieve value with key "k" from hashtable, returns 0 if it doesn't exist
 */
 int get(key_type k) {
+    int BucketIdx = hash_function(k, serverHashtable->size);
+    // acquire lock for this idx
     return -1;
+}
+void workerThread(){
+
 }
 /*
  * this is our server program. it will use ring_buffer get in order to retrieve requests. 
@@ -46,12 +92,13 @@ int main(int argc, char* argv[]){
         printf("-n and -s flags must be provided with a positive integer\n");
         return -1;
     }
-    
-    // need to initialize hashtable given our arguments
-    // get and put methods need to support concurrent operations
-    // hashtable should look like a array of linked lists. 
-    // use hash function to get array idx to insert
-    // what about resizing?
+    // create threads as specified by args?
+    // thread function will run indefinitely processing requests. 
+    // try to get something from ring (ring_get) within loop and service this request, 
+    // client status board: no structure, just a bunch of memory, we need to use that and do some addition of addrs to figure out how to access this
+    // mmap to map shmem into mem? to access it
+    serverHashtable = initializeHashtable(hashtableSize);
+    // initialize a array same size as hashtable where each idx holds a lock
 
     return 0;
 }
