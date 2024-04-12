@@ -11,15 +11,19 @@ int server_threads;
 // each bucket has a value and a mutex
 // MIGHT WANT TO CHANGE THIS FROM VALUE_TYPE TO A LIST OF VALUE TYPES
 typedef struct {
-    value_type value;
-    pthread_mutex_t mutex;
+    value_type value[1024];
+    pthread_mutex_t mutex; 
 } bucket_t;
 
-bucket_t hashtable[1000];
 
-void initHashtable(){
-    for(int i = 0; i < 1000; i++){
+bucket_t *hashtable;
+
+void initHashtable(int size){
+    hashtable = (bucket_t *)malloc(size * sizeof(bucket_t));
+    hashtable_size = size;
+    for(int i = 0; i < size; i++){
         pthread_mutex_init(&hashtable[i].mutex, NULL);
+        hashtable->value[i] = 0;
     }
 }
 
@@ -28,6 +32,9 @@ value_type get(key_type k){
     value_type v;
     
     pthread_mutex_lock(&hashtable[hash_index].mutex);
+    for(int i = 0; i < 1024; i++){
+        if(hashtable[hash_index].value[i])
+    }
     if(!hashtable[hash_index].value){
         v = hashtable[hash_index].value;
     }
