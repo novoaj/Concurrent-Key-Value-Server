@@ -80,10 +80,13 @@ void put(key_type k, value_type v){
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
 }
 
-void workerThread(struct ring* r) {
+// CHANGE changed to void* in order to fit pthread_create
+// may require more work
+void* workerThread(void* r) {
     // worker thread should run indefinitely, processing requests from ring.
     // this function will call put and get 
     // need to mutate shmem upon processing requests
+    r = (struct ring*) r;
     struct buffer_descriptor* buf;
 
     buf = malloc(sizeof(struct buffer_descriptor));
@@ -100,6 +103,7 @@ void workerThread(struct ring* r) {
             // may need to handle fail case
         }
         
+        
     }
 }
 
@@ -109,12 +113,13 @@ int main(int argc, char *argv[]){
         return -1;
     }
 
-    int init_server_threads = -1;
+    int num_threads = -1;
     int init_hashtable_size = -1;
+    struct ring* ring1;
 
     for (int i = 1; i < argc; i += 2) {
         if (strcmp(argv[i], "-n") == 0) {
-            init_server_threads = atoi(argv[i + 1]);
+            num_threads = atoi(argv[i + 1]);
         } else if (strcmp(argv[i], "-s") == 0) {
             init_hashtable_size = atoi(argv[i + 1]);
         } else {
@@ -123,12 +128,23 @@ int main(int argc, char *argv[]){
         }
     }
 
-    if(init_server_threads == -1 || init_hashtable_size == -1){
+    if(num_threads == -1 || init_hashtable_size == -1){
         return -1;
     }
     initHashtable(init_hashtable_size);
-    hashtable_size = init_hashtable_size;
-    server_threads = init_server_threads;
+
+    // create the number of threads necessary
+    pthread_t threads[num_threads];
+
+    for(int i = 0; i < num_threads; i++){
+        if (pthread_create(&threads[i], NULL, &workerThread, (void *)ring1) != 0) {
+            printf("Error creating thread %d\n", i);
+            return -1;
+        }
+    }
+
+    
+    
     // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
     char* shmem_file = "shmem_file";
     // stat to get size of file
