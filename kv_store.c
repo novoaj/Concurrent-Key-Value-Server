@@ -220,17 +220,22 @@ int main(int argc, char *argv[]){
             return -1;
         }
     }
-    closeErrorLog();
+    // does this run before worker threads terminate?
+
+    // int sleep_duration = 1; // Change this to the desired sleep duration in seconds
+    // sleep(1);
+    logMessage("jointhreads...\n");
+    for(int i = 0; i < num_threads; i++){
+        if(pthread_join(threads[i], NULL) != 0){
+            printf("Error joining threads %d\n", i);
+            logMessage("Error joining threads\n");
+            return -1;
+        }
+        
+    }
+    closeErrorLog(); // close after worker threads are done
     
     // THIS IS WHERE THE SEG FAULT IS HAPPENING, I'M NOT SURE WHY, commenting out, workerthread should run indefinitely, join relies on thread terminating
-    // for(int i = 0; i < num_threads; i++){
-        
-    //     if(pthread_join(threads[i], NULL) != 0){
-            
-    //         printf("Error joining threads %d\n", i);
-    //         return -1;
-    //     }
-        
-    // }
+
     // return 0;
 }
