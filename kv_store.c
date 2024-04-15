@@ -25,6 +25,8 @@ typedef struct {
 bucket_t *hashtable;
 FILE *error_log;
 
+pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 void openErrorLog(){
     error_log = fopen("logfile.txt", "w");
     if (error_log == NULL) {
@@ -36,9 +38,12 @@ void closeErrorLog(){
     fclose(error_log);
 }
 void logMessage(char* message){
+    pthread_mutex_lock(&log_mutex);
+
     fprintf(error_log, "%s\n", message);
     fflush(error_log); //fprintf output is buffered. this "unbuffers" it (forces buffered output to write to disk, worse for performance but guarentees we see print in our logfile)
 
+    pthread_mutex_unlock(&log_mutex);
 }
 
 void initHashtable(int size){
@@ -102,7 +107,7 @@ void put(key_type k, value_type v){
 void* workerThread(void* r) {
     // worker thread should run indefinitely, processing requests from ring.
     // this function will call put and get 
-    logMessage("worker thread");
+    logMessage("worker thread\n");
     // need to mutate shmem upon processing requests
     struct ring* ring_buffer = (struct ring*) r;
     struct buffer_descriptor* buf;
@@ -120,7 +125,6 @@ void* workerThread(void* r) {
             get(buf->k);
             // may need to handle fail case
         }
-        
         
     }
     free(buf);
@@ -201,7 +205,8 @@ int main(int argc, char *argv[]){
     // start of mem + res_off
 	close(fd);
     struct ring* r = (struct ring *) mem; // reference to our ring struct in shared mem
-    logMessage("mapped shared memory file\n");
+    snprintf(s, sizeof(s), "mapped shared memory file, ring is at %p\n", r);
+    logMessage(s);
         // create the number of threads necessary
     pthread_t threads[num_threads];
 
