@@ -121,41 +121,51 @@ int main(int argc, char *argv[]){
 
     for (int i = 1; i < argc; i += 2) {
         if (strcmp(argv[i], "-n") == 0) {
+            
             num_threads = atoi(argv[i + 1]);
         } else if (strcmp(argv[i], "-s") == 0) {
+            
             init_hashtable_size = atoi(argv[i + 1]);
         } else {
             printf("Invalid argument: %s\n", argv[i]);
             return -1;
         }
     }
-
+    
     if(num_threads == -1 || init_hashtable_size == -1){
         return -1;
     }
     initHashtable(init_hashtable_size);
-
+    
     // create the number of threads necessary
     pthread_t threads[num_threads];
 
     for(int i = 0; i < num_threads; i++){
+        
         if (pthread_create(&threads[i], NULL, &workerThread, (void *)ring1) != 0) {
             printf("Error creating thread %d\n", i);
             return -1;
         }
     }
-
+    
+    // THIS IS WHERE THE SEG FAULT IS HAPPENING, I'M NOT SURE WHY
     for(int i = 0; i < num_threads; i++){
+        
         if(pthread_join(threads[i], NULL) != 0){
+            
+            printf("Error joining threads %d\n", i);
             return -1;
         }
+        
     }
     
     // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
     char* shmem_file = "shmem_file";
     // stat to get size of file
     // // map shmem file to memory so we can access it
+    
     int fd = open(shmem_file, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+    
 	if (fd < 0)
 	    perror("open");
     // // map file
@@ -167,6 +177,6 @@ int main(int argc, char *argv[]){
 	    perror("mmap");
     // start of mem + res_off
 	close(fd);
-    struct ring* r = (struct ring *) mem; // refernece  to our ring struct in shared mem
+    struct ring* r = (struct ring *) mem; // reference to our ring struct in shared mem
     return 0;
 }
