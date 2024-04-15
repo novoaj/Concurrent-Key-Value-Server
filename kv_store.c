@@ -23,6 +23,23 @@ typedef struct {
 
 
 bucket_t *hashtable;
+FILE *error_log;
+
+void openErrorLog(){
+    error_log = fopen("logfile.txt", "w");
+    if (error_log == NULL) {
+        perror("Error opening log file");
+        // Handle error
+    }
+}
+void closeErrorLog(){
+    fclose(error_log);
+}
+void logMessage(char* message){
+    fprintf(error_log, "%s\n", message);
+    fflush(error_log); //fprintf output is buffered. this "unbuffers" it (forces buffered output to write to disk, worse for performance but guarentees we see print in our logfile)
+
+}
 
 void initHashtable(int size){
     hashtable = (bucket_t *)malloc(size * sizeof(bucket_t));
@@ -85,6 +102,7 @@ void put(key_type k, value_type v){
 void* workerThread(void* r) {
     // worker thread should run indefinitely, processing requests from ring.
     // this function will call put and get 
+    logMessage("worker thread");
     // need to mutate shmem upon processing requests
     struct ring* ring_buffer = (struct ring*) r;
     struct buffer_descriptor* buf;
@@ -110,15 +128,18 @@ void* workerThread(void* r) {
 }
 
 int main(int argc, char *argv[]){
+    openErrorLog();
+    logMessage("error log opened\n");
     if (argc != 5) {
         printf("Usage: %s -n <num_threads> -s <initial_hashtable_size>\n", argv[0]);
+        logMessage("error with args\n");
         return -1;
     }
 
     int num_threads = -1;
     int init_hashtable_size = -1;
     struct ring* ring1;
-
+    logMessage("processing args...\n");
     for (int i = 1; i < argc; i += 2) {
         if (strcmp(argv[i], "-n") == 0) {
             
@@ -131,33 +152,15 @@ int main(int argc, char *argv[]){
             return -1;
         }
     }
-    
+    char s[64];
+    snprintf(s, sizeof(s), "num_threads: %d, init_hashtable_size: %d\n", num_threads, init_hashtable_size);
+    logMessage(s);
+
     if(num_threads == -1 || init_hashtable_size == -1){
         return -1;
     }
     initHashtable(init_hashtable_size);
-    
-    // create the number of threads necessary
-    pthread_t threads[num_threads];
-
-    for(int i = 0; i < num_threads; i++){
-        
-        if (pthread_create(&threads[i], NULL, &workerThread, (void *)ring1) != 0) {
-            printf("Error creating thread %d\n", i);
-            return -1;
-        }
-    }
-    
-    // THIS IS WHERE THE SEG FAULT IS HAPPENING, I'M NOT SURE WHY
-    for(int i = 0; i < num_threads; i++){
-        
-        if(pthread_join(threads[i], NULL) != 0){
-            
-            printf("Error joining threads %d\n", i);
-            return -1;
-        }
-        
-    }
+    logMessage("init hashtable\n");
     
     // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
     char* shmem_file = "shmem_file";
@@ -178,5 +181,29 @@ int main(int argc, char *argv[]){
     // start of mem + res_off
 	close(fd);
     struct ring* r = (struct ring *) mem; // reference to our ring struct in shared mem
-    return 0;
+    logMessage("mapped shared memory file\n");
+        // create the number of threads necessary
+    pthread_t threads[num_threads];
+
+    for(int i = 0; i < num_threads; i++){
+        if (pthread_create(&threads[i], NULL, workerThread, (void *)r) != 0) { 
+        // ^ ring1 declared but never initialized - change param to r and AFTER initiliazation of r from mmapped file
+            printf("Error creating thread %d\n", i);
+            closeErrorLog();
+            return -1;
+        }
+    }
+    closeErrorLog();
+    
+    // THIS IS WHERE THE SEG FAULT IS HAPPENING, I'M NOT SURE WHY, commenting out, workerthread should run indefinitely, join relies on thread terminating
+    // for(int i = 0; i < num_threads; i++){
+        
+    //     if(pthread_join(threads[i], NULL) != 0){
+            
+    //         printf("Error joining threads %d\n", i);
+    //         return -1;
+    //     }
+        
+    // }
+    // return 0;
 }
