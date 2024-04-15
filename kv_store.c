@@ -129,7 +129,7 @@ void* workerThread(void* r) {
         
         buf->ready = 1;
         // us
-        memcpy(buf->r, buf, sizeof(struct buffer_descriptor));
+        memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
     }
     free(buf);
     return NULL;
