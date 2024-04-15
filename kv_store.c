@@ -130,31 +130,49 @@ void* workerThread(void* r) {
 int main(int argc, char *argv[]){
     openErrorLog();
     logMessage("error log opened\n");
-    if (argc != 5) {
-        printf("Usage: %s -n <num_threads> -s <initial_hashtable_size>\n", argv[0]);
-        char s[64];
-        snprintf(s, sizeof(s), "error with argc, should be 5 - got %d\n", argc);
+    // if (argc != 5) {} // for some reason ./server -n 1 -s 10000 in test1 for example comes in as argc=3,
+    // for now parse args asumming they are in expected format (2 flags each followed by ints)
+    // printf("Usage: %s -n <num_threads> -s <initial_hashtable_size>\n", argv[0]);
+    char s[64];
+    snprintf(s, sizeof(s), "argc = %d: \n", argc);
+    logMessage(s);
+    for (int i = 0; i < argc; i++){
+        snprintf(s, sizeof(s), "argv[%d]: %s\n", i, argv[i]);
         logMessage(s);
-        return -1;
     }
 
     int num_threads = -1;
     int init_hashtable_size = -1;
     struct ring* ring1;
     logMessage("processing args...\n");
-    for (int i = 1; i < argc; i += 2) {
-        if (strcmp(argv[i], "-n") == 0) {
+    // for (int i = 1; i < argc; i += 2) {
+    //     if (strcmp(argv[i], "-n") == 0) {
             
-            num_threads = atoi(argv[i + 1]);
-        } else if (strcmp(argv[i], "-s") == 0) {
+    //         num_threads = atoi(argv[i + 1]);
+    //     } else if (strcmp(argv[i], "-s") == 0) {
             
-            init_hashtable_size = atoi(argv[i + 1]);
-        } else {
-            printf("Invalid argument: %s\n", argv[i]);
-            return -1;
+    //         init_hashtable_size = atoi(argv[i + 1]);
+    //     } else {
+    //         printf("Invalid argument: %s\n", argv[i]);
+    //         return -1;
+    //     }
+    // }
+    int opt;
+    int opt_idx = 0;
+
+    while ((opt = getopt(argc, argv, "n:s:")) != -1) {
+        switch (opt) {
+            case 'n':
+                num_threads = atoi(optarg);
+                break;
+            case 's':
+                init_hashtable_size = atoi(optarg);
+                break;
+            default: 
+                printf("error, need -n, and -s flags\n");
+                return -1;
         }
     }
-    char s[64];
     snprintf(s, sizeof(s), "num_threads: %d, init_hashtable_size: %d\n", num_threads, init_hashtable_size);
     logMessage(s);
 
@@ -192,6 +210,7 @@ int main(int argc, char *argv[]){
         if (pthread_create(&threads[i], NULL, workerThread, (void *)r) != 0) { 
         // ^ ring1 declared but never initialized - change param to r and AFTER initiliazation of r from mmapped file
             printf("Error creating thread %d\n", i);
+            logMessage("Error creating worker threads\n");
             closeErrorLog();
             return -1;
         }
