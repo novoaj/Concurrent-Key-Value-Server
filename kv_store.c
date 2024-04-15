@@ -114,10 +114,11 @@ void* workerThread(void* r) {
 
     buf = malloc(sizeof(struct buffer_descriptor));
     while(1){
-        ring_get(ring_buffer, buf);
-        struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
-        memcpy(result, buf, sizeof(struct buffer_descriptor));
-        result->ready = 1;
+        ring_get(buf, ring_buffer);
+        // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
+        // memcpy(result, buf, sizeof(struct buffer_descriptor));
+        //result->ready = 1;
+        
         if(buf->req_type == PUT){
             put(buf->k, buf->v);
         }
@@ -126,6 +127,9 @@ void* workerThread(void* r) {
             // may need to handle fail case
         }
         
+        buf->ready = 1;
+        // us
+        memcpy(buf->r, buf, sizeof(struct buffer_descriptor));
     }
     free(buf);
     return NULL;
