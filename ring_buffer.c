@@ -1,5 +1,6 @@
 #include "ring_buffer.h"
 #include <stdlib.h>
+#include <string.h>
 
 pthread_mutex_t ring_mutex;
 pthread_cond_t ring_not_full = PTHREAD_COND_INITIALIZER;
@@ -104,8 +105,8 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
 
     // copy buffer descriptor from ring buffer
     // potentially move this out of lock to improve performance
-    *bd = r->buffer[r->c_head];
-    memcpy(*bd, r->buffer[r->c_head], sizeof(struct buffer_descriptor));
+    // *bd = r->buffer[r->c_head]; // reference copy, deep copy is below
+    memcpy(&bd, &r->buffer[r->c_head], sizeof(struct buffer_descriptor));
     r->c_head = (r->c_head + 1) % RING_SIZE;
 
     // signal that buffer is not full anymore

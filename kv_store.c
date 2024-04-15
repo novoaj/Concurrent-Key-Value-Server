@@ -114,7 +114,7 @@ void* workerThread(void* r) {
 
     buf = malloc(sizeof(struct buffer_descriptor));
     while(1){
-        ring_get(buf, ring_buffer);
+        ring_get(ring_buffer, buf);
         // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
         // memcpy(result, buf, sizeof(struct buffer_descriptor));
         //result->ready = 1;
