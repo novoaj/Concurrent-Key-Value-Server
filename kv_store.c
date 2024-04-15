@@ -132,7 +132,9 @@ int main(int argc, char *argv[]){
     logMessage("error log opened\n");
     if (argc != 5) {
         printf("Usage: %s -n <num_threads> -s <initial_hashtable_size>\n", argv[0]);
-        logMessage("error with args\n");
+        char s[64];
+        snprintf(s, sizeof(s), "error with argc, should be 5 - got %d\n", argc);
+        logMessage(s);
         return -1;
     }
 
@@ -185,6 +187,7 @@ int main(int argc, char *argv[]){
         // create the number of threads necessary
     pthread_t threads[num_threads];
 
+    logMessage("launching threads...\n");
     for(int i = 0; i < num_threads; i++){
         if (pthread_create(&threads[i], NULL, workerThread, (void *)r) != 0) { 
         // ^ ring1 declared but never initialized - change param to r and AFTER initiliazation of r from mmapped file
