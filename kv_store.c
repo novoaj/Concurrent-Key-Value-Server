@@ -86,13 +86,13 @@ void* workerThread(void* r) {
     // worker thread should run indefinitely, processing requests from ring.
     // this function will call put and get 
     // need to mutate shmem upon processing requests
-    r = (struct ring*) r;
+    struct ring* ring_buffer = (struct ring*) r;
     struct buffer_descriptor* buf;
 
     buf = malloc(sizeof(struct buffer_descriptor));
     while(1){
-        ring_get(r, buf);
-        struct buffer_descriptor *result = (struct buffer_descriptor *)&r + buf->res_off;
+        ring_get(ring_buffer, buf);
+        struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
         memcpy(result, buf, sizeof(struct buffer_descriptor));
         result->ready = 1;
         if(buf->req_type == PUT){
@@ -105,6 +105,8 @@ void* workerThread(void* r) {
         
         
     }
+    free(buf);
+    return NULL;
 }
 
 int main(int argc, char *argv[]){
@@ -143,7 +145,11 @@ int main(int argc, char *argv[]){
         }
     }
 
-    
+    for(int i = 0; i < num_threads; i++){
+        if(pthread_join(threads[i], NULL) != 0){
+            return -1;
+        }
+    }
     
     // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
     char* shmem_file = "shmem_file";
