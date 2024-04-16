@@ -3,10 +3,15 @@
 #include <string.h> // remove these 2 includes if linker errors occur
 #include <stdio.h>
 #include <stdatomic.h>
+#include <unistd.h>
 
 pthread_mutex_t ring_mutex;
 pthread_cond_t ring_not_full = PTHREAD_COND_INITIALIZER;
 pthread_cond_t ring_not_empty = PTHREAD_COND_INITIALIZER;
+
+int CompareAndSwap(int* addr, int expected, int new){
+    
+}
 
 /**
  * Helper method that checks if ring buffer is full
@@ -47,8 +52,8 @@ void init_mutex(struct ring* r){
  * printed to output by the client program
 */
 int init_ring(struct ring *r){
-    r->c_head = 0; 
-    r->c_tail = 0; 
+    r->c_head = -1; 
+    r->c_tail = -1; 
     r->p_head = 0; 
     r->p_tail = 0; 
 
@@ -81,30 +86,40 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     pthread_mutex_lock(&ring_mutex);
     int old_p_head = r->p_head;
     int old_c_tail = r->c_tail;
-    int next_index = (old_p_head + 1) % RING_SIZE;
-    while(r->p_head - r->c_tail == RING_SIZE - 1){
-        // pthread_cond_wait(&ring_not_full, &ring_mutex);
-        //usleep(1000); // busywait instead of sleep?
+    // get next index and wrap around if too large
+    int next_index = (r->p_head + 1) % RING_SIZE;
+    
+    r->p_head = next_index;
+    r->p_tail = next_index;
+    while(next_index == r->c_tail){
         pthread_mutex_unlock(&ring_mutex);
         sleep(1);
         pthread_mutex_lock(&ring_mutex);
     }
-    pthread_mutex_unlock(&ring_mutex);
-    // CAS: original, expected, new
-    // porblem is if CAS fails - r->phead changes, we need to redo the above operations?
-    // or is simply updating ol_p_head enough?
-    while (!atomic_compare_exchange_strong(&r->p_head, &old_p_head, old_p_head + 1)){
-        old_p_head = r->p_head; 
+    // ring is full
+    // producer trying to put item where item already exists
+    if(r->p_head == r->c_tail){
+        //pthread_cond_wait(&ring_not_full, &ring_mutex);
     }
-    // pthread_mutex_lock(&ring_mutex);
-    // // get next index and wrap around if too large
-    // r->p_head = next_index;
-    // pthread_mutex_unlock(&ring_mutex);
-    memcpy(&r->buffer[old_p_head], &bd, sizeof(struct buffer_descriptor));
-    r->p_tail = (r->p_tail + 1) % RING_SIZE;
+    //r->buffer[next_index] = *bd; // ref copy lets try deep copy
+
+    memcpy(&bd, &r->buffer[old_p_head], sizeof(struct buffer_descriptor));
+    // bd->k = r->buffer[old_p_head].k;
+    // bd->v = r->buffer[old_p_head].v;
+    // bd->ready = r->buffer[old_p_head].ready;
+    // bd->req_type = r->buffer[old_p_head].req_type;
+    // bd->res_off = r->buffer[old_p_head].res_off;
+    printf("%ls", &r->buffer[old_p_head].k);
+    // this should be a copy at head? head holds empty struct initially, we wanna copy to head, incrementing head to next so any other ops see that head = head+1 essentially so no collisions
+    // with current logic, first insert happens at idx 1 with 0 being empty
+    //r->p_tail = (r->p_tail + 1) % RING_SIZE;
+    //r->p_tail = r->p_tail + 1 ; 
+    // just incrementing tail here, problem could occur with concurrent requests i believe if we just set the value to old_head
+
     // signal buffer is not empty 
-    // pthread_cond_signal(&ring_not_empty);
-    
+    //pthread_cond_signal(&ring_not_empty);
+
+    pthread_mutex_unlock(&ring_mutex);
 }
 
 /*

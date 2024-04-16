@@ -33,6 +33,7 @@ void openErrorLog(){
         perror("Error opening log file");
         // Handle error
     }
+    
 }
 void closeErrorLog(){
     fclose(error_log);
@@ -73,9 +74,11 @@ value_type get(key_type k){
     for(int i = 0; i < 1024; i++){
         if(hashtable[hash_index].keys[i] == k){
             v = hashtable[hash_index].value[i];
+          
         }
     }
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
+    
     return v;
 }
 
@@ -101,6 +104,7 @@ void put(key_type k, value_type v){
     }else{ // item exists (key exists): update value
         hashtable[hash_index].value[valueIdx] = v;
     }
+    
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
 }
 
@@ -148,12 +152,15 @@ void* workerThread(void* r) {
         memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
         
     }
+    
     free(buf);
     return NULL;
 }
 
 int main(int argc, char *argv[]){
+    
     openErrorLog();
+    
     logMessage("error log opened\n");
     // if (argc != 5) {} // for some reason ./server -n 1 -s 10000 in test1 for example comes in as argc=3,
     // for now parse args asumming they are in expected format (2 flags each followed by ints)
@@ -161,11 +168,12 @@ int main(int argc, char *argv[]){
     char s[64];
     snprintf(s, sizeof(s), "argc = %d: \n", argc);
     logMessage(s);
+    
     for (int i = 0; i < argc; i++){
         snprintf(s, sizeof(s), "argv[%d]: %s\n", i, argv[i]);
         logMessage(s);
     }
-
+    
     int num_threads = -1;
     int init_hashtable_size = -1;
     struct ring* ring1;
@@ -234,7 +242,7 @@ int main(int argc, char *argv[]){
 
     }
     // does this run before worker threads terminate?
-
+    
     // int sleep_duration = 1; // Change this to the desired sleep duration in seconds
     // sleep(1);
     logMessage("join threads...\n");
@@ -246,6 +254,7 @@ int main(int argc, char *argv[]){
         }
         
     }
+    
     closeErrorLog(); // close after worker threads are done
     
     // THIS IS WHERE THE SEG FAULT IS HAPPENING, I'M NOT SURE WHY, commenting out, workerthread should run indefinitely, join relies on thread terminating
