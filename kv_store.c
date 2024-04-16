@@ -95,6 +95,7 @@ void put(key_type k, value_type v){
     // new item: insert value and key
     if (valueIdx == -1){
         // naive insert
+        // could cut down on time here
         for (int i = 0; i < 1024; i++){
             if (hashtable[hash_index].value[i] == 0) {
                 hashtable[hash_index].value[i] = v;
