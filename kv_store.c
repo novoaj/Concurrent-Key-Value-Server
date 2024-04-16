@@ -118,15 +118,23 @@ void* workerThread(void* r) {
     
     buf = malloc(sizeof(struct buffer_descriptor));
     
+    char s[64];
+    snprintf(s, 64, "phead %d\tptail %d\tchead %d\tctail %d\n",
+             ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
+    logMessage(s); 
     while(1){
         logMessage("calling ring_get\n");
         ring_get(ring_buffer, buf); // hanging here, not able to process requests
         // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
         // memcpy(result, buf, sizeof(struct buffer_descriptor));
         //result->ready = 1;
-        char s[64];
+        // char s[64];
         snprintf(s, sizeof(s), "got: k - %d, v - %d, type - %d, res_off - %d, ready - %d\n", buf->k, buf->v, buf->req_type, buf->res_off, buf->ready);
         logMessage(s);
+
+        snprintf(s, 64, "phead %d\tptail %d\tchead %d\tctail %d\n",
+                ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
+        logMessage(s); 
         if(buf->req_type == PUT){
             put(buf->k, buf->v);
         }
@@ -211,7 +219,9 @@ int main(int argc, char *argv[]){
     logMessage(s);
         // create the number of threads necessary
     pthread_t threads[num_threads];
-
+    snprintf(s, 64, "phead %d\tptail %d\tchead %d\tctail %d\n",
+             r->p_head, r->p_tail, r->c_head, r->c_tail);
+    logMessage(s);
     logMessage("launching threads...\n");
     for(int i = 0; i < num_threads; i++){
         if (pthread_create(&threads[i], NULL, workerThread, (void *)r) != 0) { 
