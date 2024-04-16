@@ -2,10 +2,15 @@
 #include <stdlib.h>
 #include <string.h> // remove these 2 includes if linker errors occur
 #include <stdio.h>
+#include <unistd.h>
 
 pthread_mutex_t ring_mutex;
 pthread_cond_t ring_not_full = PTHREAD_COND_INITIALIZER;
 pthread_cond_t ring_not_empty = PTHREAD_COND_INITIALIZER;
+
+int CompareAndSwap(int* addr, int expected, int new){
+    
+}
 
 /**
  * Helper method that checks if ring buffer is full
@@ -45,8 +50,8 @@ void init_mutex(){
  * printed to output by the client program
 */
 int init_ring(struct ring *r){
-    r->c_head = 0; 
-    r->c_tail = 0; 
+    r->c_head = -1; 
+    r->c_tail = -1; 
     r->p_head = 0; 
     r->p_tail = 0; 
 
@@ -57,7 +62,7 @@ int init_ring(struct ring *r){
         r->buffer[i].res_off = 0;
         r->buffer[i].ready = 0;
     }
-
+    init_mutex();
     return 0;
 }
 
@@ -76,9 +81,12 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     //     pthread_cond_wait(&ring_not_full, &ring_mutex);
     // }
     
-    while(r->p_head + 1 - r->c_tail >= RING_SIZE){
-        pthread_cond_wait(&ring_not_full, &ring_mutex);
-    }
+    // while(r->p_head + 1 - r->c_tail >= RING_SIZE){
+    //     //pthread_cond_wait(&ring_not_full, &ring_mutex);
+    //     //pthread_yield(&ring_mutex);
+    //     ;
+    // }
+    //pthread_mutex_lock(&ring_mutex);
 
     int old_p_head = r->p_head;
     int old_c_tail = r->c_tail;
@@ -87,8 +95,15 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     
     r->p_head = next_index;
     r->p_tail = next_index;
+    while(next_index == r->c_tail){
+        pthread_mutex_unlock(&ring_mutex);
+        sleep(1);
+        pthread_mutex_lock(&ring_mutex);
+    }
+    // ring is full
+    // producer trying to put item where item already exists
     if(r->p_head == r->c_tail){
-        pthread_cond_wait(&ring_not_full, &ring_mutex);
+        //pthread_cond_wait(&ring_not_full, &ring_mutex);
     }
     //r->buffer[next_index] = *bd; // ref copy lets try deep copy
 
@@ -106,7 +121,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     // just incrementing tail here, problem could occur with concurrent requests i believe if we just set the value to old_head
 
     // signal buffer is not empty 
-    pthread_cond_signal(&ring_not_empty);
+    //pthread_cond_signal(&ring_not_empty);
 
     pthread_mutex_unlock(&ring_mutex);
 }
@@ -128,7 +143,10 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     //     pthread_cond_wait(&ring_not_empty, &ring_mutex);
     // }
     while(r->c_head == r->p_tail){
-        pthread_cond_wait(&ring_not_empty, &ring_mutex);
+        //pthread_cond_wait(&ring_not_empty, &ring_mutex);
+        pthread_mutex_unlock(&ring_mutex);
+        sleep(1);
+        pthread_mutex_lock(&ring_mutex);
     }
     // copy buffer descriptor from ring buffer
     // potentially move this out of lock to improve performance
