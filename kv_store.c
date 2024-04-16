@@ -95,6 +95,7 @@ void put(key_type k, value_type v){
     // new item: insert value and key
     if (valueIdx == -1){
         // naive insert
+        // could cut down on time here
         for (int i = 0; i < 1024; i++){
             if (hashtable[hash_index].value[i] == 0) {
                 hashtable[hash_index].value[i] = v;
@@ -143,10 +144,9 @@ void* workerThread(void* r) {
             put(buf->k, buf->v);
         }
         else if(buf->req_type == GET){
-            get(buf->k);
+            buf->v = get(buf->k);
             // may need to handle fail case // TODO get return value needs to go somewhere - needs to be copied to shmem?
         }
-        
         buf->ready = 1;
         // us
         memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
