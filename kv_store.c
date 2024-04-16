@@ -123,11 +123,11 @@ void* workerThread(void* r) {
     
     buf = malloc(sizeof(struct buffer_descriptor));
     
-    char s[64];
-    snprintf(s, 64, "ring info from worker thread: phead %d\tptail %d\tchead %d\tctail %d\n",
-             ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
-    logMessage(s); 
     while(1){
+        char s[64];
+        snprintf(s, 64, "ring before get: phead %d\tptail %d\tchead %d\tctail %d\n",
+                ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
+        logMessage(s); 
         logMessage("calling ring_get\n");
         ring_get(ring_buffer, buf); // hanging here, not able to process requests
         // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
@@ -161,23 +161,14 @@ int main(int argc, char *argv[]){
     
     openErrorLog();
     
-    logMessage("error log opened\n");
     // if (argc != 5) {} // for some reason ./server -n 1 -s 10000 in test1 for example comes in as argc=3,
     // for now parse args asumming they are in expected format (2 flags each followed by ints)
     // printf("Usage: %s -n <num_threads> -s <initial_hashtable_size>\n", argv[0]);
     char s[64];
-    snprintf(s, sizeof(s), "argc = %d: \n", argc);
-    logMessage(s);
-    
-    for (int i = 0; i < argc; i++){
-        snprintf(s, sizeof(s), "argv[%d]: %s\n", i, argv[i]);
-        logMessage(s);
-    }
     
     int num_threads = -1;
     int init_hashtable_size = -1;
     struct ring* ring1;
-    logMessage("processing args...\n");
 
     int opt;
     int opt_idx = 0;
@@ -202,7 +193,6 @@ int main(int argc, char *argv[]){
         return -1;
     }
     initHashtable(init_hashtable_size);
-    logMessage("init hashtable\n");
     
     // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
     char* shmem_file = "shmem_file";
@@ -230,7 +220,6 @@ int main(int argc, char *argv[]){
     snprintf(s, 64, "ring info after mapping: phead %d\tptail %d\tchead %d\tctail %d\n",
              r->p_head, r->p_tail, r->c_head, r->c_tail);
     logMessage(s);
-    logMessage("launching threads...\n");
     for(int i = 0; i < num_threads; i++){
         if (pthread_create(&threads[i], NULL, workerThread, (void *)r) != 0) { 
         // ^ ring1 declared but never initialized - change param to r and AFTER initiliazation of r from mmapped file
