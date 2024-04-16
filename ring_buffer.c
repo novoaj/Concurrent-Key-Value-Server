@@ -81,10 +81,13 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     // get next index and wrap around if too large
     int next_index = (r->p_head + 1) % RING_SIZE;
     r->p_head = next_index;
-    r->buffer[next_index] = *bd;
-    
+    // r->buffer[next_index] = *bd; // ref copy lets try deep copy
+    memcpy(&r->buffer[old_p_head], &bd, sizeof(struct buffer_descriptor));
+    // this should be a copy at head? head holds empty struct initially, we wanna copy to head, incrementing head to next so any other ops see that head = head+1 essentially so no collisions
+    // with current logic, first insert happens at idx 1 with 0 being empty
     //r->p_tail = (r->p_tail + 1) % RING_SIZE;
-    r->p_tail = old_p_head;
+    r->p_tail = r->p_tail + 1; 
+    // just incrementing tail here, problem could occur with concurrent requests i believe if we just set the value to old_head
 
     // signal buffer is not empty 
     pthread_cond_signal(&ring_not_empty);
@@ -116,7 +119,7 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     int c_head_next =(r->c_head + 1) % RING_SIZE;
     
     //*bd = r->buffer[r->c_head];
-    memcpy((void*)bd, r->buffer[r->c_head], sizeof(struct buffer_descriptor));
+    memcpy((void*)bd, &r->buffer[old_c_head], sizeof(struct buffer_descriptor));
     r->c_head = c_head_next;
     r->c_tail = c_head_next;
 
