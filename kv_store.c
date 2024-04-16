@@ -119,7 +119,7 @@ void* workerThread(void* r) {
     buf = malloc(sizeof(struct buffer_descriptor));
     
     char s[64];
-    snprintf(s, 64, "phead %d\tptail %d\tchead %d\tctail %d\n",
+    snprintf(s, 64, "ring info from worker thread: phead %d\tptail %d\tchead %d\tctail %d\n",
              ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
     logMessage(s); 
     while(1){
@@ -129,10 +129,10 @@ void* workerThread(void* r) {
         // memcpy(result, buf, sizeof(struct buffer_descriptor));
         //result->ready = 1;
         // char s[64];
-        snprintf(s, sizeof(s), "got: k - %d, v - %d, type - %d, res_off - %d, ready - %d\n", buf->k, buf->v, buf->req_type, buf->res_off, buf->ready);
+        snprintf(s, sizeof(s), "got: k - %u, v - %u, type - %u, res_off - %u, ready - %u\n", buf->k, buf->v, buf->req_type, buf->res_off, buf->ready);
         logMessage(s);
 
-        snprintf(s, 64, "phead %d\tptail %d\tchead %d\tctail %d\n",
+        snprintf(s, 64, "ring info after ring_get: phead %d\tptail %d\tchead %d\tctail %d\n",
                 ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
         logMessage(s); 
         if(buf->req_type == PUT){
@@ -140,7 +140,7 @@ void* workerThread(void* r) {
         }
         else if(buf->req_type == GET){
             get(buf->k);
-            // may need to handle fail case
+            // may need to handle fail case // TODO get return value needs to go somewhere - needs to be copied to shmem?
         }
         
         buf->ready = 1;
@@ -219,7 +219,7 @@ int main(int argc, char *argv[]){
     logMessage(s);
         // create the number of threads necessary
     pthread_t threads[num_threads];
-    snprintf(s, 64, "phead %d\tptail %d\tchead %d\tctail %d\n",
+    snprintf(s, 64, "ring info after mapping: phead %d\tptail %d\tchead %d\tctail %d\n",
              r->p_head, r->p_tail, r->c_head, r->c_tail);
     logMessage(s);
     logMessage("launching threads...\n");
