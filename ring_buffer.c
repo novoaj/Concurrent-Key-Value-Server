@@ -1,5 +1,7 @@
 #include "ring_buffer.h"
 #include <stdlib.h>
+#include <string.h> // remove these 2 includes if linker errors occur
+#include <stdio.h>
 
 pthread_mutex_t ring_mutex;
 pthread_cond_t ring_not_full = PTHREAD_COND_INITIALIZER;
@@ -26,7 +28,7 @@ int is_ring_full(struct ring *r){
 */
 int is_ring_empty(struct ring *r){
     for(int i = 0; i < RING_SIZE; i++){
-        if(r->buffer[i].v!= 0){
+        if(r->buffer[i].v != 0){
             return 0;
         }
     }
@@ -71,14 +73,18 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     pthread_mutex_lock(&ring_mutex);
     // wait for buffer to have open spots
     while(is_ring_full(r) == 1){
-        pthread_cond_wait(&ring_not_empty, &ring_mutex);
+        pthread_cond_wait(&ring_not_full, &ring_mutex);
     }
 
+    int old_p_head = r->p_head;
+    int old_c_tail = r->c_tail;
     // get next index and wrap around if too large
     int next_index = (r->p_head + 1) % RING_SIZE;
-    r->buffer[next_index] = *bd;
     r->p_head = next_index;
-    r->p_tail = (r->p_tail + 1) % RING_SIZE;
+    r->buffer[next_index] = *bd;
+    
+    //r->p_tail = (r->p_tail + 1) % RING_SIZE;
+    r->p_tail = old_p_head;
 
     // signal buffer is not empty 
     pthread_cond_signal(&ring_not_empty);
@@ -97,20 +103,26 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
 void ring_get(struct ring *r, struct buffer_descriptor *bd){
 
     pthread_mutex_lock(&ring_mutex);
-
+    
     while(is_ring_empty(r) == 1){
+        printf("ring_get\n");
         pthread_cond_wait(&ring_not_empty, &ring_mutex);
     }
-
+   
     // copy buffer descriptor from ring buffer
     // potentially move this out of lock to improve performance
+    int old_c_head = r->c_head;
+    int old_p_tail = r->p_tail;
+    int c_head_next =(r->c_head + 1) % RING_SIZE;
+    
     *bd = r->buffer[r->c_head];
-    memcpy(*bd, r->buffer[r->c_head], sizeof(struct buffer_descriptor));
-    r->c_head = (r->c_head + 1) % RING_SIZE;
+    memcpy((void*)bd, r->buffer, sizeof(struct buffer_descriptor));
+    r->c_head = c_head_next;
+    r->c_tail = c_head_next;
 
     // signal that buffer is not full anymore
     pthread_cond_signal(&ring_not_full);
-
+    
     pthread_mutex_unlock(&ring_mutex);
 }
 
