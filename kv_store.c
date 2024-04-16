@@ -107,18 +107,23 @@ void put(key_type k, value_type v){
 void* workerThread(void* r) {
     // worker thread should run indefinitely, processing requests from ring.
     // this function will call put and get 
+    
     logMessage("worker thread\n");
+    
     // need to mutate shmem upon processing requests
     struct ring* ring_buffer = (struct ring*) r;
     struct buffer_descriptor* buf;
-
+    
     buf = malloc(sizeof(struct buffer_descriptor));
+    
     while(1){
-        ring_get(buf, ring_buffer);
+        printf("before ring_get\n");
+        ring_get(ring_buffer, buf);
+        printf("after ring_get\n");
         // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
         // memcpy(result, buf, sizeof(struct buffer_descriptor));
         //result->ready = 1;
-        
+        logMessage("while loop\n");
         if(buf->req_type == PUT){
             put(buf->k, buf->v);
         }
@@ -130,6 +135,7 @@ void* workerThread(void* r) {
         buf->ready = 1;
         // us
         memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
+        
     }
     free(buf);
     return NULL;
@@ -153,18 +159,7 @@ int main(int argc, char *argv[]){
     int init_hashtable_size = -1;
     struct ring* ring1;
     logMessage("processing args...\n");
-    // for (int i = 1; i < argc; i += 2) {
-    //     if (strcmp(argv[i], "-n") == 0) {
-            
-    //         num_threads = atoi(argv[i + 1]);
-    //     } else if (strcmp(argv[i], "-s") == 0) {
-            
-    //         init_hashtable_size = atoi(argv[i + 1]);
-    //     } else {
-    //         printf("Invalid argument: %s\n", argv[i]);
-    //         return -1;
-    //     }
-    // }
+
     int opt;
     int opt_idx = 0;
 
@@ -223,12 +218,13 @@ int main(int argc, char *argv[]){
             closeErrorLog();
             return -1;
         }
+
     }
     // does this run before worker threads terminate?
 
     // int sleep_duration = 1; // Change this to the desired sleep duration in seconds
     // sleep(1);
-    logMessage("jointhreads...\n");
+    logMessage("join threads...\n");
     for(int i = 0; i < num_threads; i++){
         if(pthread_join(threads[i], NULL) != 0){
             printf("Error joining threads %d\n", i);
