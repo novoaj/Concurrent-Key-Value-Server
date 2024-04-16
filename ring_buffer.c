@@ -72,7 +72,11 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     
     pthread_mutex_lock(&ring_mutex);
     // wait for buffer to have open spots
-    while(is_ring_full(r) == 1){
+    // while(is_ring_full(r) == 1){
+    //     pthread_cond_wait(&ring_not_full, &ring_mutex);
+    // }
+    
+    while(r->p_head + 1 - r->c_tail >= RING_SIZE){
         pthread_cond_wait(&ring_not_full, &ring_mutex);
     }
 
@@ -107,21 +111,23 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
 
     pthread_mutex_lock(&ring_mutex);
     
-    while(is_ring_empty(r) == 1){
-        printf("ring_get\n");
+    // while(is_ring_empty(r) == 1){
+    //     printf("ring_get\n");
+    //     pthread_cond_wait(&ring_not_empty, &ring_mutex);
+    // }
+    while(r->c_head == r->p_tail){
         pthread_cond_wait(&ring_not_empty, &ring_mutex);
     }
-   
     // copy buffer descriptor from ring buffer
     // potentially move this out of lock to improve performance
     int old_c_head = r->c_head;
     int old_p_tail = r->p_tail;
     int c_head_next =(r->c_head + 1) % RING_SIZE;
-    
+    r->c_head = c_head_next; //increment head before copy operation
     //*bd = r->buffer[r->c_head];
     memcpy((void*)bd, &r->buffer[old_c_head], sizeof(struct buffer_descriptor));
-    r->c_head = c_head_next;
-    r->c_tail = c_head_next;
+    
+    r->c_tail = r->c_tail + 1;
 
     // signal that buffer is not full anymore
     pthread_cond_signal(&ring_not_full);
