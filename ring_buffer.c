@@ -115,8 +115,8 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     int old_p_tail = r->p_tail;
     int c_head_next =(r->c_head + 1) % RING_SIZE;
     
-    *bd = r->buffer[r->c_head];
-    memcpy((void*)bd, r->buffer, sizeof(struct buffer_descriptor));
+    //*bd = r->buffer[r->c_head];
+    memcpy((void*)bd, r->buffer[r->c_head], sizeof(struct buffer_descriptor));
     r->c_head = c_head_next;
     r->c_tail = c_head_next;
 

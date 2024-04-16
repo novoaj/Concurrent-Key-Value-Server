@@ -81,7 +81,9 @@ value_type get(key_type k){
 
 
 void put(key_type k, value_type v){
-    
+    char s[64];
+    snprintf(s, sizeof(s), "putting %d : %d\n", k, v);
+    logMessage(s);
     index_t hash_index = hash_function(k, hashtable_size);
     pthread_mutex_lock(&hashtable[hash_index].mutex);
    
@@ -117,13 +119,14 @@ void* workerThread(void* r) {
     buf = malloc(sizeof(struct buffer_descriptor));
     
     while(1){
-        printf("before ring_get\n");
-        ring_get(ring_buffer, buf);
-        printf("after ring_get\n");
+        logMessage("calling ring_get\n");
+        ring_get(ring_buffer, buf); // hanging here, not able to process requests
         // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
         // memcpy(result, buf, sizeof(struct buffer_descriptor));
         //result->ready = 1;
-        logMessage("while loop\n");
+        char s[64];
+        snprintf(s, sizeof(s), "got: k - %d, v - %d, type - %d, res_off - %d, ready - %d\n", buf->k, buf->v, buf->req_type, buf->res_off, buf->ready);
+        logMessage(s);
         if(buf->req_type == PUT){
             put(buf->k, buf->v);
         }
