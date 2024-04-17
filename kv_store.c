@@ -151,8 +151,11 @@ void* workerThread(void* r) {
             buf->v = get(buf->k);
             // may need to handle fail case // TODO get return value needs to go somewhere - needs to be copied to shmem?
         }
-        buf->ready = 1;
+        
+        struct buffer_descriptor* window = (struct buffer_descriptor*) &ring_buffer + buf->res_off;
         // us
+        memcpy(window, buf, sizeof(struct buffer_descriptor));
+        window->ready = 1;
         printf("memcpying to shmem...\n");
         memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
         printf("memcpy complete, request processed\n\n");

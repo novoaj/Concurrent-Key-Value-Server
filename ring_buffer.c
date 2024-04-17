@@ -7,8 +7,6 @@
 
 pthread_mutex_t submit_ring_mutex;
 pthread_mutex_t get_ring_mutex;
-pthread_cond_t ring_not_full = PTHREAD_COND_INITIALIZER;
-pthread_cond_t ring_not_empty = PTHREAD_COND_INITIALIZER;
 
 int CompareAndSwap(int* addr, int expected, int new){
     
@@ -98,6 +96,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     pthread_mutex_lock(&submit_ring_mutex);
     printf("incrementing p_tail\n");
     r->p_tail = r->p_tail + 1;
+
     pthread_mutex_unlock(&submit_ring_mutex);
     printf("%ls", &r->buffer[old_p_head].k);
 }
