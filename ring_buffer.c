@@ -75,15 +75,15 @@ int init_ring(struct ring *r){
  * guaranteed to be valid during the invocation of the function
 */
 void ring_submit(struct ring *r, struct buffer_descriptor *bd){
-    printf("\nring_submit\n");
-    printf("phead: %d, ptail: %d, chead: %d, ctail: %d\n", r->p_head, r->p_tail, r->c_head, r->c_tail);
+    // printf("\nring_submit\n");
+    // printf("phead: %d, ptail: %d, chead: %d, ctail: %d\n", r->p_head, r->p_tail, r->c_head, r->c_tail);
    
     int old_p_head = r->p_head;
     int old_c_tail = r->c_tail;
     // get next index and wrap around if too large
     int next_index = (r->p_head + 1);
     // r->p_head = next_index;
-    printf("old_p_head: %d, old_c_tail: %d, next_index: %d\n",old_p_head, old_c_tail, next_index);
+    // printf("old_p_head: %d, old_c_tail: %d, next_index: %d\n",old_p_head, old_c_tail, next_index);
     while(1){
         
         if(r->p_head - r->c_tail < RING_SIZE){
@@ -94,7 +94,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
         old_p_head = r->p_head;
         old_c_tail = r->c_tail;
     }
-    printf("submit memcpy\n");
+    // printf("submit memcpy\n");
     memcpy(&r->buffer[old_p_head % RING_SIZE], (void*)bd, sizeof(struct buffer_descriptor));
    
     while(1){
@@ -104,7 +104,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
             break;
         }
     }
-    printf("exiting ring_submit\n");
+    // printf("exiting ring_submit\n");
 }
 
 /*
@@ -116,17 +116,14 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
  * the signature.
 */
 void ring_get(struct ring *r, struct buffer_descriptor *bd){
-    printf("\nring_get\n");
-    printf("phead: %d, ptail: %d, chead: %d, ctail: %d\n", r->p_head, r->p_tail, r->c_head, r->c_tail);
-
-    
-    // printf("incrementing c_head\n");
+    // printf("\nring_get\n");
+    // printf("phead: %d, ptail: %d, chead: %d, ctail: %d\n", r->p_head, r->p_tail, r->c_head, r->c_tail);
     
     int old_c_head = r->c_head;
     int old_p_tail = r->p_tail;
     int c_head_next =(r->c_head + 1);
     // r->c_head = c_head_next; //increment head before copy operation
-    printf("old_p_head: %d, old_c_tail: %d, next_index: %d\n",old_c_head, old_p_tail, c_head_next);
+    // printf("old_p_head: %d, old_c_tail: %d, next_index: %d\n",old_c_head, old_p_tail, c_head_next);
     while(1){
         if(old_c_head < old_p_tail){
             //printf("atomic infinity\n");
@@ -139,19 +136,19 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
         
     }
     
-    printf("before memcpy\n");
+    // printf("before memcpy\n");
     memcpy((void*)bd, &r->buffer[old_c_head % RING_SIZE], sizeof(struct buffer_descriptor));
-    printf("after memcpy\n");
+    // printf("after memcpy\n");
     while(1){
         // Abby said ==
         if(r->c_tail == old_c_head){
             r->c_tail++;
             break;
         }
-        printf("infinite loop?\n");
+        // printf("infinite loop?\n");
     }
     
-    printf("exiting ring_get\n");
+    // printf("exiting ring_get\n");
 }
 
 

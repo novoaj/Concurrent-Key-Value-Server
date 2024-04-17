@@ -141,7 +141,7 @@ void* workerThread(void* r) {
     // worker thread should run indefinitely, processing requests from ring.
     // this function will call get 
     
-    printf("spawned worker thread\n");
+    // printf("spawned worker thread\n");
     
     // need to mutate shmem upon processing requests
     struct ring* ring_buffer = (struct ring*) r;
@@ -151,14 +151,14 @@ void* workerThread(void* r) {
     
     while(1){
         char s[64];
-        printf("ring before get: phead %d\tptail %d\tchead %d\tctail %d\n",
-                ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
+        // printf("ring before get: phead %d\tptail %d\tchead %d\tctail %d\n",
+        //         ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
         ring_get(ring_buffer, buf); // hanging here, not able to process requests
         // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
         // client only submits "w" requests before waiting to hear back from server?
 
-        printf("ring info after ring_get: phead %d\tptail %d\tchead %d\tctail %d\n",
-                ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
+        // printf("ring info after ring_get: phead %d\tptail %d\tchead %d\tctail %d\n",
+        //         ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
         if(buf->req_type == PUT){
             printf("\nPUT request...\n");
             put(buf->k, buf->v);
@@ -170,21 +170,17 @@ void* workerThread(void* r) {
         }
         
         struct buffer_descriptor* window = (struct buffer_descriptor*) ((char*) ring_buffer + buf->res_off); // do we dereference ring_buffer when adding
-        printf("window calc without &: %p\n", ring_buffer + buf->res_off);
-        printf("window calc with &: %p\n", &ring_buffer + buf->res_off);
-        printf("Addr of ring buffer: %p\n", (void*)ring_buffer);
-        printf("buf->res_off %d\n", buf->res_off);
+        // printf("window calc without &: %p\n", ring_buffer + buf->res_off);
+        // printf("window calc with &: %p\n", &ring_buffer + buf->res_off);
+        // printf("Addr of ring buffer: %p\n", (void*)ring_buffer);
+        // printf("buf->res_off %d\n", buf->res_off);
         // us,
-        printf("memcpying to shmem...\n");
+        // printf("memcpying to shmem...\n");
         printf("buf contents: buf->k %d, buf->v %d, buf->ready %d, buf->req_type %d\n", buf->k, buf->v, buf->ready, buf->req_type);
         memcpy(window, buf, sizeof(struct buffer_descriptor));
         window->ready = 1;
-        printf("window ptr: %p\n", (void*) window);
+        // printf("window ptr: %p\n", (void*) window);
         printf("window contents: window->k %d, window->v %d, window->ready %d, window->req_type %d\n", window->k, window->v, window->ready, window->req_type);
-
-        
-
-        //memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
         printf("memcpy complete, request processed\n\n");
         
     }
