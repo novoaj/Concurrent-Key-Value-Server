@@ -6,8 +6,6 @@
 
 pthread_mutex_t submit_ring_mutex;
 pthread_mutex_t get_ring_mutex;
-pthread_cond_t ring_not_full = PTHREAD_COND_INITIALIZER;
-pthread_cond_t ring_not_empty = PTHREAD_COND_INITIALIZER;
 
 int CompareAndSwap(int* addr, int expected, int new){
     
@@ -77,21 +75,22 @@ int init_ring(struct ring *r){
 */
 void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     
+    while(r->p_head - r->c_tail >= RING_SIZE){
+        printf("ring_submit is running\n");
+    }
+    
     pthread_mutex_lock(&submit_ring_mutex);
     int old_p_head = r->p_head;
     int old_c_tail = r->c_tail;
     // get next index and wrap around if too large
     int next_index = (r->p_head + 1);
-    
     r->p_head = next_index;
+    pthread_mutex_unlock(&submit_ring_mutex);
+
+    memcpy(&r->buffer[old_p_head % RING_SIZE], (struct buffer_descriptor*)bd, sizeof(struct buffer_descriptor));
+
+    pthread_mutex_lock(&submit_ring_mutex);
     r->p_tail = r->p_tail + 1;
-    while(r->p_head - r->c_tail == RING_SIZE){
-
-    }
-
-    memcpy(&bd, &r->buffer[old_p_head % RING_SIZE], sizeof(struct buffer_descriptor));
-    printf("%ls", &r->buffer[old_p_head].k);
-
 
     pthread_mutex_unlock(&submit_ring_mutex);
 }
@@ -106,23 +105,22 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
 */
 void ring_get(struct ring *r, struct buffer_descriptor *bd){
 
-    pthread_mutex_lock(&get_ring_mutex);
-    
- 
-    while(r->c_head == r->p_tail){
-
+    while(r->c_head >= r->p_tail){
+        printf("ring_get is running\n");
+        
     }
-    // copy buffer descriptor from ring buffer
-    // potentially move this out of lock to improve performance
+    
+    pthread_mutex_lock(&get_ring_mutex);
     int old_c_head = r->c_head;
     int old_p_tail = r->p_tail;
     int c_head_next =(r->c_head + 1);
     r->c_head = c_head_next; //increment head before copy operation
-    //*bd = r->buffer[r->c_head];
-    memcpy((void*)bd, &r->buffer[old_c_head % RING_SIZE], sizeof(struct buffer_descriptor));
+    pthread_mutex_unlock(&get_ring_mutex);
+
+    memcpy((struct buffer_descriptor*)bd, &r->buffer[old_c_head % RING_SIZE], sizeof(struct buffer_descriptor));
     
+    pthread_mutex_lock(&get_ring_mutex);
     r->c_tail = r->c_tail + 1;
-    
     pthread_mutex_unlock(&get_ring_mutex);
 }
 

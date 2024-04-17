@@ -144,14 +144,14 @@ void* workerThread(void* r) {
             put(buf->k, buf->v);
         }
         else if(buf->req_type == GET){
-            get(buf->k);
+            buf->v = get(buf->k);
             // may need to handle fail case
         }
         
-        buf->ready = 1;
+        struct buffer_descriptor* window = (struct buffer_descriptor*) &ring_buffer + buf->res_off;
         // us
-        memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
-        
+        memcpy(window, buf, sizeof(struct buffer_descriptor));
+        window->ready = 1;
     }
     
     free(buf);
