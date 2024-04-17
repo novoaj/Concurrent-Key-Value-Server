@@ -77,25 +77,29 @@ int init_ring(struct ring *r){
  * guaranteed to be valid during the invocation of the function
 */
 void ring_submit(struct ring *r, struct buffer_descriptor *bd){
-    
+    printf("\nring_submit\n");
+    printf("phead: %d, ptail: %d, chead: %d, ctail: %d\n", r->p_head, r->p_tail, r->c_head, r->c_tail);
+    while(r->p_head - r->c_tail >= RING_SIZE){
+        printf("spinwaiting, ring is full\n");
+    }
+
     pthread_mutex_lock(&submit_ring_mutex);
+    printf("incrementing p_head\n");
     int old_p_head = r->p_head;
     int old_c_tail = r->c_tail;
     // get next index and wrap around if too large
     int next_index = (r->p_head + 1);
-    
     r->p_head = next_index;
-    
-    while(r->p_head - r->c_tail == RING_SIZE){
-
-    }
-
-    memcpy(&bd, &r->buffer[old_p_head % RING_SIZE], sizeof(struct buffer_descriptor));
-    r->p_tail = r->p_tail + 1;
-    printf("%ls", &r->buffer[old_p_head].k);
-
-
     pthread_mutex_unlock(&submit_ring_mutex);
+
+    printf("copying - %d, %d \n", bd->k, bd->v);
+    memcpy(&r->buffer[old_p_head % RING_SIZE], (void*)bd, sizeof(struct buffer_descriptor));
+   
+    pthread_mutex_lock(&submit_ring_mutex);
+    printf("incrementing p_tail\n");
+    r->p_tail = r->p_tail + 1;
+    pthread_mutex_unlock(&submit_ring_mutex);
+    printf("%ls", &r->buffer[old_p_head].k);
 }
 
 /*
@@ -107,25 +111,30 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
  * the signature.
 */
 void ring_get(struct ring *r, struct buffer_descriptor *bd){
-
-    pthread_mutex_lock(&get_ring_mutex);
-    
- 
-    while(r->c_head == r->p_tail){
-
+    printf("\nring_get\n");
+    printf("phead: %d, ptail: %d, chead: %d, ctail: %d\n", r->p_head, r->p_tail, r->c_head, r->c_tail);
+    while(r->c_head >= r->p_tail){
+        // printf("spinwaiting, ring is empty\n");
+        // printf("1");
     }
-    // copy buffer descriptor from ring buffer
-    // potentially move this out of lock to improve performance
+
+    
+    pthread_mutex_lock(&get_ring_mutex);
+    printf("incrementing c_head\n");
     int old_c_head = r->c_head;
     int old_p_tail = r->p_tail;
     int c_head_next =(r->c_head + 1);
     r->c_head = c_head_next; //increment head before copy operation
-    //*bd = r->buffer[r->c_head];
-    memcpy((void*)bd, &r->buffer[old_c_head % RING_SIZE], sizeof(struct buffer_descriptor));
-    
-    r->c_tail = r->c_tail + 1;
-    
     pthread_mutex_unlock(&get_ring_mutex);
+
+    memcpy((void*)bd, &r->buffer[old_c_head % RING_SIZE], sizeof(struct buffer_descriptor));
+
+    pthread_mutex_lock(&get_ring_mutex);
+    printf("incrementing c_tail\n");
+    r->c_tail = r->c_tail + 1;
+    pthread_mutex_unlock(&get_ring_mutex);
+    
+    
 }
 
 
