@@ -87,16 +87,18 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     while(1){
         
         if(r->p_head - r->c_tail < RING_SIZE){
-            if(atomic_compare_exchange_strong(&r->p_head, &old_p_head, next_index)){
+            if(atomic_compare_exchange_strong(&r->p_head, &old_p_head, old_p_head +1)){
                 break;
             }
         }
         old_p_head = r->p_head;
         old_c_tail = r->c_tail;
+        //next_index = (old_p_head + 1);
     }
     // printf("submit memcpy\n");
     memcpy(&r->buffer[old_p_head % RING_SIZE], (void*)bd, sizeof(struct buffer_descriptor));
    
+    //pthread_mutex_lock(&submit_ring_mutex);
     while(1){
         //  Abby said ==
         if(r->p_tail == old_p_head){
@@ -104,6 +106,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
             break;
         }
     }
+   // pthread_mutex_unlock(&submit_ring_mutex);
     // printf("exiting ring_submit\n");
 }
 
@@ -127,26 +130,30 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     while(1){
         if(old_c_head < old_p_tail){
             //printf("atomic infinity\n");
-            if(atomic_compare_exchange_strong(&r->c_head, &old_c_head, c_head_next)){
+            if(atomic_compare_exchange_strong(&r->c_head, &old_c_head, old_c_head + 1)){
                 break;
             }
         }
         old_c_head = r->c_head;
         old_p_tail = r->p_tail;
-        
+        //c_head_next =(old_c_head + 1);
     }
     
     // printf("before memcpy\n");
+    // maybe no void ptr
     memcpy((void*)bd, &r->buffer[old_c_head % RING_SIZE], sizeof(struct buffer_descriptor));
     // printf("after memcpy\n");
+    //pthread_mutex_lock(&get_ring_mutex);
     while(1){
         // Abby said ==
         if(r->c_tail == old_c_head){
             r->c_tail++;
             break;
         }
+
         // printf("infinite loop?\n");
     }
+    //pthread_mutex_unlock(&get_ring_mutex);
     
     // printf("exiting ring_get\n");
 }
