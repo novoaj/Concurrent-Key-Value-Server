@@ -116,6 +116,7 @@ void* workerThread(void* r) {
     // this function will call put and get 
     
     logMessage("worker thread\n");
+    printf("spawned worker thread\n");
     
     // need to mutate shmem upon processing requests
     struct ring* ring_buffer = (struct ring*) r;
@@ -125,31 +126,36 @@ void* workerThread(void* r) {
     
     while(1){
         char s[64];
-        snprintf(s, 64, "ring before get: phead %d\tptail %d\tchead %d\tctail %d\n",
+        printf("ring before get: phead %d\tptail %d\tchead %d\tctail %d\n",
                 ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
-        logMessage(s); 
-        logMessage("calling ring_get\n");
+        // snprintf(s, 64, "ring before get: phead %d\tptail %d\tchead %d\tctail %d\n",
+        //         ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
+        // logMessage(s); 
         ring_get(ring_buffer, buf); // hanging here, not able to process requests
         // struct buffer_descriptor *result = &ring_buffer->buffer[buf->res_off];
-        // memcpy(result, buf, sizeof(struct buffer_descriptor));
-        //result->ready = 1;
-        // char s[64];
-        snprintf(s, sizeof(s), "got: k - %u, v - %u, type - %u, res_off - %u, ready - %u\n", buf->k, buf->v, buf->req_type, buf->res_off, buf->ready);
-        logMessage(s);
+        // client only submits "w" requests before waiting to hear back from server?
+        // snprintf(s, sizeof(s), "got: k - %u, v - %u, type - %u, res_off - %u, ready - %u\n", buf->k, buf->v, buf->req_type, buf->res_off, buf->ready);
+        // logMessage(s);
 
-        snprintf(s, 64, "ring info after ring_get: phead %d\tptail %d\tchead %d\tctail %d\n",
+        printf("ring info after ring_get: phead %d\tptail %d\tchead %d\tctail %d\n",
                 ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
-        logMessage(s); 
+        // snprintf(s, 64, "ring info after ring_get: phead %d\tptail %d\tchead %d\tctail %d\n",
+        //         ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
+        // logMessage(s); 
         if(buf->req_type == PUT){
+            printf("PUT request...\n");
             put(buf->k, buf->v);
         }
         else if(buf->req_type == GET){
+            printf("GET request...\n");
             buf->v = get(buf->k);
             // may need to handle fail case // TODO get return value needs to go somewhere - needs to be copied to shmem?
         }
         buf->ready = 1;
         // us
+        printf("memcpying to shmem...\n");
         memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
+        printf("memcpy complete, request processed\n\n");
         
     }
     
