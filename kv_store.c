@@ -145,7 +145,7 @@ void* workerThread(void* r) {
         memcpy(window, buf, sizeof(struct buffer_descriptor));
         window->ready = 1;
         printf("memcpying to shmem...\n");
-        memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
+       // memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
         printf("memcpy complete, request processed\n\n");
         
     }
