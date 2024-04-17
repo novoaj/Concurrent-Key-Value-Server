@@ -129,7 +129,7 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     printf("old_p_head: %d, old_c_tail: %d, next_index: %d\n",old_c_head, old_p_tail, c_head_next);
     while(1){
         if(old_c_head < old_p_tail){
-            printf("atomic infinity\n");
+            //printf("atomic infinity\n");
             if(atomic_compare_exchange_strong(&r->c_head, &old_c_head, c_head_next)){
                 break;
             }
