@@ -142,19 +142,20 @@ void put(key_type k, value_type v){
             printf("mem alloc failure\n");
         }
     }
-
-    int valueIdx = get_value_idx(&hashtable[hash_index], k);
-    printf("index of key = %d\n", valueIdx);
+    
+    //int valueIdx = get_value_idx(&hashtable[hash_index], k);
+    // printf("index of key = %d\n", valueIdx);
     // new item: insert value and key
-    if (valueIdx == -1){
-        printf("inside the valueIdx if statement\n");
+    // if (valueIdx == -1){
+        //printf("inside the valueIdx if statement\n");
         // naive insert
         // could cut down on time here
-        printf("start of for loop capacity = %d\n", hashtable[hash_index].capacity);
+        printf("start of for loop capacity = %d and count = %d\n", hashtable[hash_index].capacity, hashtable[hash_index].count);
+        printf(" hashtable[hash_index] %d",  hashtable[hash_index].keys[hash_index]);
         for (int i = 0; i < hashtable[hash_index].capacity; i++){
-            printf("insloop");
-            printf("hashtable[hash_index].value[i] = %d\n", hashtable[hash_index].value[i]);
-            if (hashtable[hash_index].value[i] == 0) {
+            printf("insloop\n");
+            //printf("hashtable[hash_index].value[i] = %d\n", hashtable[hash_index].value[i]);
+            if (hashtable[hash_index].keys[i] == 0) {
                 hashtable[hash_index].keys[i] = k;
                 hashtable[hash_index].value[i] = v;
                 hashtable[hash_index].count++;
@@ -164,12 +165,18 @@ void put(key_type k, value_type v){
                 }
                 break;
             }
+            else if(hashtable[hash_index].keys[i] == k){
+                hashtable[hash_index].value[i] = v;
+                break;
+            }
+            
         }
         printf("left the for loop\n");
-    }else{ // item exists (key exists): update value
-        hashtable[hash_index].value[valueIdx] = v;
         
-    }
+    // }else{ // item exists (key exists): update value
+    //     hashtable[hash_index].value[valueIdx] = v;
+        
+    // }
     
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
     printf("PUT releasing the lock\n");
