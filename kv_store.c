@@ -53,6 +53,7 @@ void initHashtable(int size){
     for(int i = 0; i < size; i++){
         pthread_mutex_init(&hashtable[i].mutex, NULL);
         hashtable->value[i] = 0;
+        hashtable->keys[i] = 0;
     }
 }
 // returns idx that value lives at (this is for the case when key already exists in this bucket)
@@ -95,6 +96,7 @@ void put(key_type k, value_type v){
         // could cut down on time here
         for (int i = 0; i < 1024; i++){
             if (hashtable[hash_index].value[i] == 0) {
+                hashtable[hash_index].keys[i] = k;
                 hashtable[hash_index].value[i] = v;
                 break;
             }
@@ -155,7 +157,7 @@ void* workerThread(void* r) {
 
         
 
-       // memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
+        //memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
         printf("memcpy complete, request processed\n\n");
         
     }
