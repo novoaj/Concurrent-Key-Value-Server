@@ -82,7 +82,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     int old_c_tail = r->c_tail;
     // get next index and wrap around if too large
     int next_index = (r->p_head + 1);
-    r->p_head = next_index;
+    // r->p_head = next_index;
     while(1){
         
         if(r->p_head - r->c_tail < RING_SIZE){
@@ -98,7 +98,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
    
     while(1){
         //  Abby said ==
-        if(r->p_tail != old_p_head){
+        if(r->p_tail == old_p_head){
             r->p_tail++;
             break;
         }
@@ -124,7 +124,7 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     int old_c_head = r->c_head;
     int old_p_tail = r->p_tail;
     int c_head_next =(r->c_head + 1);
-    r->c_head = c_head_next; //increment head before copy operation
+    // r->c_head = c_head_next; //increment head before copy operation
     while(1){
         if(old_c_head < old_p_tail){
             printf("atomic infinity\n");
@@ -142,7 +142,7 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     printf("after memcpy\n");
     while(1){
         // Abby said ==
-        if(r->c_tail != old_c_head){
+        if(r->c_tail == old_c_head){
             r->c_tail++;
             break;
         }
