@@ -16,8 +16,10 @@ int server_threads;
 // each bucket has a value and a mutex
 // MIGHT WANT TO CHANGE THIS FROM VALUE_TYPE TO A LIST OF VALUE TYPES
 typedef struct {
-    value_type value[1024];
-    key_type keys[1024];
+    value_type *value;
+    key_type *keys;
+    int capacity;
+    int count;
     pthread_mutex_t mutex; 
 } bucket_t;
 
@@ -49,7 +51,8 @@ void logMessage(char* message){
 
 void initHashtable(int size){
     hashtable = (bucket_t *)malloc(size * sizeof(bucket_t));
-    hashtable_size = size;
+    hashtable->capacity = size;
+    hashtable->count = 0;
     for(int i = 0; i < size; i++){
         pthread_mutex_init(&hashtable[i].mutex, NULL);
         hashtable->value[i] = 0;
@@ -72,6 +75,8 @@ value_type get(key_type k){
     value_type v = 0;
     
     pthread_mutex_lock(&hashtable[hash_index].mutex);
+
+    
     for(int i = 0; i < 1024; i++){
         if(hashtable[hash_index].keys[i] == k){
             v = hashtable[hash_index].value[i];
@@ -83,26 +88,48 @@ value_type get(key_type k){
     return v;
 }
 
+void resize_bucket (bucket_t* bucket){
+    int new_capacity = bucket->capacity * 2;
+    value_type *new_values = (value_type *)realloc(bucket->value, new_capacity * sizeof(value_type));
+    key_type *new_keys = (key_type *)realloc(bucket->keys, new_capacity * sizeof(key_type));
+    if (new_values && new_keys) {
+        bucket->value = new_values;
+        bucket->keys = new_keys;
+        bucket->capacity = new_capacity;
+
+    } else {
+        // Handle memory allocation failure
+        // For simplicity, you can just print an error message
+        printf("Memory reallocation failed\n");
+    }
+}
+
 
 void put(key_type k, value_type v){
     index_t hash_index = hash_function(k, hashtable_size);
-    pthread_mutex_lock(&hashtable[hash_index].mutex);
-   
+    
+   pthread_mutex_lock(&hashtable[hash_index].mutex);
     int valueIdx = get_value_idx(&hashtable[hash_index], k);
      
     // new item: insert value and key
     if (valueIdx == -1){
         // naive insert
         // could cut down on time here
-        for (int i = 0; i < 1024; i++){
+        
+        for (int i = 0; i < hashtable[hash_index].capacity; i++){
             if (hashtable[hash_index].value[i] == 0) {
                 hashtable[hash_index].keys[i] = k;
                 hashtable[hash_index].value[i] = v;
+                // hashtable[hash_index].count++;
+                // if(hashtable[hash_index].count == hashtable[hash_index].capacity){
+                //     resize_bucket(&hashtable[hash_index]);
+                // }
                 break;
             }
         }
     }else{ // item exists (key exists): update value
         hashtable[hash_index].value[valueIdx] = v;
+        
     }
     
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
