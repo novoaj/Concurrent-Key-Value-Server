@@ -140,7 +140,9 @@ void* workerThread(void* r) {
             // may need to handle fail case // TODO get return value needs to go somewhere - needs to be copied to shmem?
         }
         
-        struct buffer_descriptor* window = (struct buffer_descriptor*) &ring_buffer + buf->res_off;
+        struct buffer_descriptor* window = (struct buffer_descriptor*) &ring_buffer + buf->res_off; // do we dereference ring_buffer when adding
+        printf("window calc without &: %p\n", ring_buffer + buf->res_off);
+        printf("window calc with &: %p\n", &ring_buffer + buf->res_off);
         printf("Addr of ring buffer: %p\n", (void*)ring_buffer);
         printf("buf->res_off %d\n", buf->res_off);
         // us,
