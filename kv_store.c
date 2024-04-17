@@ -131,20 +131,30 @@ void* workerThread(void* r) {
         printf("ring info after ring_get: phead %d\tptail %d\tchead %d\tctail %d\n",
                 ring_buffer->p_head, ring_buffer->p_tail, ring_buffer->c_head, ring_buffer->c_tail);
         if(buf->req_type == PUT){
-            printf("PUT request...\n");
+            printf("\nPUT request...\n");
             put(buf->k, buf->v);
         }
         else if(buf->req_type == GET){
-            printf("GET request...\n");
+            printf("\nGET request...\n");
             buf->v = get(buf->k);
             // may need to handle fail case // TODO get return value needs to go somewhere - needs to be copied to shmem?
         }
         
-        struct buffer_descriptor* window = (struct buffer_descriptor*) &ring_buffer + buf->res_off;
-        // us
+        struct buffer_descriptor* window = (struct buffer_descriptor*) ((char*) ring_buffer + buf->res_off); // do we dereference ring_buffer when adding
+        printf("window calc without &: %p\n", ring_buffer + buf->res_off);
+        printf("window calc with &: %p\n", &ring_buffer + buf->res_off);
+        printf("Addr of ring buffer: %p\n", (void*)ring_buffer);
+        printf("buf->res_off %d\n", buf->res_off);
+        // us,
+        printf("memcpying to shmem...\n");
+        printf("buf contents: buf->k %d, buf->v %d, buf->ready %d, buf->req_type %d\n", buf->k, buf->v, buf->ready, buf->req_type);
         memcpy(window, buf, sizeof(struct buffer_descriptor));
         window->ready = 1;
-        printf("memcpying to shmem...\n");
+        printf("window ptr: %p\n", (void*) window);
+        printf("window contents: window->k %d, window->v %d, window->ready %d, window->req_type %d\n", window->k, window->v, window->ready, window->req_type);
+
+        
+
        // memcpy(&ring_buffer + buf->res_off, buf, sizeof(struct buffer_descriptor));
         printf("memcpy complete, request processed\n\n");
         
