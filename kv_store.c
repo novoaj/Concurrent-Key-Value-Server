@@ -51,23 +51,30 @@ void logMessage(char* message){
 
 void initHashtable(int size){
     hashtable = (bucket_t *)malloc(size * sizeof(bucket_t));
-    hashtable->capacity = size;
-    hashtable->count = 0;
-    for(int i = 0; i < size; i++){
+    hashtable->value = (value_type *)malloc(size * sizeof(value_type));
+    hashtable->keys = (key_type *)malloc(size * sizeof(key_type));
+
+    for(int i = 0; i < 1024; i++){
         pthread_mutex_init(&hashtable[i].mutex, NULL);
         hashtable->value[i] = 0;
         hashtable->keys[i] = 0;
+        hashtable[i].capacity = 1024;
+        hashtable[i].count = 0;
     }
 }
 // returns idx that value lives at (this is for the case when key already exists in this bucket)
 // return -1 if no value found
 int get_value_idx(bucket_t* bucket, key_type k){
-    for (int i = 0; i < 1024; i++){
+    printf("entering get_value_idx\n");
+    for (int i = 0; i < bucket->count; i++){
         if (bucket->keys[i] == k){
+            printf("index found, returning from get_value_idx\n");
             return i;
         }
     }
+    printf("leaving get_value_idx\n");
     return -1;
+    
 }
 
 value_type get(key_type k){
@@ -76,8 +83,8 @@ value_type get(key_type k){
     
     pthread_mutex_lock(&hashtable[hash_index].mutex);
 
-    
-    for(int i = 0; i < 1024; i++){
+    // potentially count to capacity
+    for(int i = 0; i < hashtable[hash_index].count; i++){
         if(hashtable[hash_index].keys[i] == k){
             v = hashtable[hash_index].value[i];
             break;
@@ -106,33 +113,43 @@ void resize_bucket (bucket_t* bucket){
 
 
 void put(key_type k, value_type v){
+    printf("Put k = %d v = %d\n", k, v);
+    printf("entering put\n");
     index_t hash_index = hash_function(k, hashtable_size);
+    printf("hash index: %d\n", hash_index);
+    printf("bucket capacity = %d bucket count = %d\n", hashtable[hash_index].capacity, hashtable[hash_index].count);
     
-   pthread_mutex_lock(&hashtable[hash_index].mutex);
+    printf("PUT acquiring the lock\n");
+    pthread_mutex_lock(&hashtable[hash_index].mutex);
     int valueIdx = get_value_idx(&hashtable[hash_index], k);
-     
+    printf("index of key = %d\n", valueIdx);
     // new item: insert value and key
     if (valueIdx == -1){
+        printf("inside the valueIdx if statement\n");
         // naive insert
         // could cut down on time here
-        
+        printf("start of for loop capacity = %d\n", hashtable[hash_index].capacity);
         for (int i = 0; i < hashtable[hash_index].capacity; i++){
+            printf("hashtable[hash_index].value[i] = %d\n", hashtable[hash_index].value[i]);
             if (hashtable[hash_index].value[i] == 0) {
                 hashtable[hash_index].keys[i] = k;
                 hashtable[hash_index].value[i] = v;
-                // hashtable[hash_index].count++;
-                // if(hashtable[hash_index].count == hashtable[hash_index].capacity){
-                //     resize_bucket(&hashtable[hash_index]);
-                // }
+                hashtable[hash_index].count++;
+                if(hashtable[hash_index].count == hashtable[hash_index].capacity){
+                    printf("resizing in put\n");
+                    resize_bucket(&hashtable[hash_index]);
+                }
                 break;
             }
         }
+        printf("left the for loop\n");
     }else{ // item exists (key exists): update value
         hashtable[hash_index].value[valueIdx] = v;
         
     }
     
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
+    printf("PUT releasing the lock\n");
 }
 
 // CHANGE changed to void* in order to fit pthread_create
@@ -217,6 +234,7 @@ int main(int argc, char *argv[]){
         return -1;
     }
     initHashtable(init_hashtable_size);
+    hashtable_size = init_hashtable_size;
     
     // TODO: spawn threads that will be infinitely looping and calling ring_get - based on bd filled in from ring_get, we call put or get
     char* shmem_file = "shmem_file";
