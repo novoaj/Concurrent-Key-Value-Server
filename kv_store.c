@@ -75,7 +75,7 @@ value_type get(key_type k){
     for(int i = 0; i < 1024; i++){
         if(hashtable[hash_index].keys[i] == k){
             v = hashtable[hash_index].value[i];
-          
+            break;
         }
     }
     pthread_mutex_unlock(&hashtable[hash_index].mutex);
