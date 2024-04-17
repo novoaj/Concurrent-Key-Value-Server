@@ -96,9 +96,7 @@ void ring_submit(struct ring *r, struct buffer_descriptor *bd){
     pthread_mutex_lock(&submit_ring_mutex);
     printf("incrementing p_tail\n");
     r->p_tail = r->p_tail + 1;
-
     pthread_mutex_unlock(&submit_ring_mutex);
-    printf("%ls", &r->buffer[old_p_head].k);
 }
 
 /*
@@ -113,11 +111,8 @@ void ring_get(struct ring *r, struct buffer_descriptor *bd){
     printf("\nring_get\n");
     printf("phead: %d, ptail: %d, chead: %d, ctail: %d\n", r->p_head, r->p_tail, r->c_head, r->c_tail);
     while(r->c_head >= r->p_tail){
-        // printf("spinwaiting, ring is empty\n");
-        // printf("1");
+       
     }
-
-    
     pthread_mutex_lock(&get_ring_mutex);
     printf("incrementing c_head\n");
     int old_c_head = r->c_head;
